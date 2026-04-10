@@ -261,10 +261,22 @@ def _expand_preset(
 
 
 def merge_settings(target: dict, fragment: dict) -> dict:
-    """Deep-merge fragment into target. Target wins on scalar conflicts.
+    """Merge a settings.json fragment into an existing target settings dict.
 
-    Hook arrays merge by `matcher`; within a matched group, hooks dedupe
-    by `command`. permissions.allow and permissions.deny set-union.
+    Only two top-level keys from the fragment are merged into the target:
+
+    - ``hooks`` — hook arrays merge by ``matcher``; within a matched group,
+      hook entries dedupe by ``command`` string. This is idempotent: running
+      the same merge twice produces the same result.
+    - ``permissions.allow`` and ``permissions.deny`` — set-union against the
+      target's lists.
+
+    Every other top-level key in the fragment (e.g. ``enabledPlugins``,
+    ``model``, ``outputStyle``) is ignored. Clank fragments should never set
+    those — the target project owns them, and the installer preserves them.
+
+    The target dict is returned as a deep copy with the above merges applied.
+    Target values always win on scalar conflicts in the preserved keys.
     """
     result = copy.deepcopy(target)
 
@@ -457,8 +469,16 @@ def install(
         print("no artifacts selected", file=sys.stderr)
         return 2
 
+    # Validate the target even in dry-run so the preview is honest. The
+    # .claude/ directory creation is the only mutation skipped in dry-run.
+    if not target.exists():
+        raise InstallError(f"target does not exist: {target}")
+    if not target.is_dir():
+        raise InstallError(f"target is not a directory: {target}")
+    if (target / "manifest.toml").exists() and (target / "base").is_dir():
+        raise InstallError(f"refusing to install into clank itself: {target}")
     if not dry_run:
-        check_target(target)
+        (target / ".claude").mkdir(exist_ok=True)
 
     on_conflict = _conflict_callback(conflict_policy)
 
@@ -502,7 +522,51 @@ def _conflict_callback(policy: str) -> Callable[[Path], str]:
         return lambda _dst: "overwrite"
     if policy == "skip":
         return lambda _dst: "skip"
-    return lambda _dst: "overwrite"
+    if policy == "interactive":
+        return _interactive_conflict_prompt
+    raise InstallError(f"unknown conflict policy: {policy}")
+
+
+def _interactive_conflict_prompt(dst: Path) -> str:
+    """Per-file conflict prompt used when --force is not set."""
+    while True:
+        try:
+            answer = (
+                input(
+                    f"Conflict: {dst} already exists.\n"
+                    "  [s]kip / [o]verwrite / [d]iff / [a]bort > "
+                )
+                .strip()
+                .lower()
+            )
+        except EOFError:
+            # Non-interactive stdin (e.g. tests, CI) — fall through to skip
+            return "skip"
+
+        if answer in ("", "s", "skip"):
+            return "skip"
+        if answer in ("o", "overwrite"):
+            return "overwrite"
+        if answer in ("a", "abort"):
+            return "abort"
+        if answer in ("d", "diff"):
+            try:
+                import subprocess
+
+                result = subprocess.run(
+                    ["head", "-20", str(dst)],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                print(f"--- existing content of {dst.name} (first 20 lines) ---")
+                print(result.stdout)
+                print("---")
+            except Exception as e:
+                print(f"(diff failed: {e})")
+            # Loop and re-prompt
+            continue
+        print(f"Unknown choice: {answer!r}. Pick s/o/d/a.")
 
 
 def _seed_settings(clank_root: Path) -> dict:

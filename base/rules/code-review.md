@@ -25,7 +25,7 @@ Before requesting review, ensure:
 
 ## Agent Usage
 
-Use the **code-reviewer** agent for all code reviews. It covers code quality, security, Python best practices, performance, and project conventions. Launch it proactively after every meaningful code change. **Always run it in the background**.
+Use the **code-reviewer** agent for all code reviews. It covers code quality, security, language best practices, performance, and project conventions. Launch it proactively after every meaningful code change. **Always run it in the background**.
 
 ## Review Checklist
 
