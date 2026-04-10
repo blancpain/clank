@@ -1,0 +1,26 @@
+# clank — Claude Code template installer manifest
+#
+# This file is the source of truth for every artifact (agent, hook, rule,
+# skill, plugin-doc) clank knows how to install, and for every preset that
+# bundles artifacts into common install configurations.
+#
+# Schema:
+#   version              — manifest schema version, currently 1
+#   [[artifacts]]        — one block per artifact:
+#     id                 — stable string identifier, unique across the manifest
+#     type               — "agent" | "hook" | "rule" | "skill" | "plugin-doc"
+#     path               — file path relative to clank root; directory path for skills
+#     description        — human-readable one-liner for --list and install summary
+#     tags               — list of strings; used by @tag:<name> expansion in presets
+#     settings_fragment  — (optional) path to the hook's settings.json fragment
+#     default            — (optional) bool; false excludes from @tag/@preset expansion
+#     requires_mcp       — (optional) list of MCP server names; soft hint only
+#
+#   [presets]            — map of preset name -> list of member selectors
+#     Selectors: artifact ID, "@preset:<name>", "@tag:<name>", or "@tag:*"
+
+version = 1
+
+artifacts = []
+
+[presets]
