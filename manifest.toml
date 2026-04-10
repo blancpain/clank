@@ -28,4 +28,25 @@ path = "base/agents/code-reviewer.md"
 description = "Language-agnostic code reviewer — confidence filtering, severity mapping, AI-code quirks"
 tags = ["base", "review"]
 
+[[artifacts]]
+id = "security-reviewer"
+type = "agent"
+path = "base/agents/security-reviewer.md"
+description = "OWASP-focused security reviewer — injection, secrets, crypto, deserialization, path traversal"
+tags = ["base", "review", "security"]
+
+[[artifacts]]
+id = "docs-researcher"
+type = "agent"
+path = "base/agents/docs-researcher.md"
+description = "Documentation fetcher — uses ctx7 CLI then WebFetch. Protects main context from doc dumps."
+tags = ["base", "research"]
+
+[[artifacts]]
+id = "doc-updater"
+type = "agent"
+path = "base/agents/doc-updater.md"
+description = "Reports stale sections in project docs relative to recent code changes. Read-only."
+tags = ["base", "docs"]
+
 [presets]
