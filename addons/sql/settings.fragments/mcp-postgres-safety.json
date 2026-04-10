@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "mcp__postgres__query",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/pretooluse-mcp-postgres-safety.sh",
+            "statusMessage": "SQL safety checks..."
+          }
+        ]
+      }
+    ]
+  }
+}

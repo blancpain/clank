@@ -1,0 +1,43 @@
+# This is a template. Rename to schema.txt and fill in your project's schema here.
+# The querying-db skill expects to find schema.txt in this directory.
+#
+# Format: one section per table, one line per column, with type and key notes.
+# Add a "# notes:" line for enum values, constraints, and gotchas that affect queries.
+
+# Project Schema Reference
+
+## Tables
+
+### users
+- id                  BIGINT          PRIMARY KEY
+- email               TEXT            NOT NULL UNIQUE
+- created_at          TIMESTAMPTZ     NOT NULL DEFAULT now()
+- role                users_role      NOT NULL DEFAULT 'member'
+# notes: users_role enum = ('admin', 'member', 'viewer')
+
+### orders
+- id                  BIGINT          PRIMARY KEY
+- user_id             BIGINT          NOT NULL REFERENCES users(id)
+- amount_cents        INTEGER         NOT NULL CHECK (amount_cents >= 0)
+- created_at          TIMESTAMPTZ     NOT NULL DEFAULT now()
+- status              TEXT            NOT NULL DEFAULT 'pending'
+# notes: status is one of ('pending', 'paid', 'refunded', 'cancelled')
+
+## Enums
+
+### users_role
+admin | member | viewer
+
+## Common joins
+
+- orders → users: orders.user_id = users.id
+- Use LEFT JOIN when users may be soft-deleted
+
+## Indexes
+
+- users: PRIMARY KEY (id), UNIQUE (email)
+- orders: PRIMARY KEY (id), INDEX on (user_id), INDEX on (status, created_at)
+
+## Gotchas
+
+- (Add project-specific type mismatches, quoting requirements, timezone rules, etc.)

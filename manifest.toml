@@ -267,8 +267,45 @@ path = "addons/typescript/rules/typescript-patterns.md"
 description = "TypeScript idioms — discriminated unions, branded types, exhaustive switches"
 tags = ["typescript", "patterns"]
 
+[[artifacts]]
+id = "sql-reviewer"
+type = "agent"
+path = "addons/sql/agents/sql-reviewer.md"
+description = "SQL query reviewer — parameterization, N+1, indexes, CTE clarity"
+tags = ["sql", "review"]
+
+[[artifacts]]
+id = "mcp-postgres-safety"
+type = "hook"
+path = "addons/sql/hooks/pretooluse-mcp-postgres-safety.sh"
+settings_fragment = "addons/sql/settings.fragments/mcp-postgres-safety.json"
+description = "PreToolUse guardrail on mcp__postgres__query — blocks DROP/TRUNCATE/DELETE/UPDATE"
+tags = ["sql", "safety", "postgres"]
+
+[[artifacts]]
+id = "sql-safety"
+type = "rule"
+path = "addons/sql/rules/sql-safety.md"
+description = "SQL safety — destructive DDL discipline, parameterized queries, migration rules"
+tags = ["sql", "safety"]
+
+[[artifacts]]
+id = "querying-db"
+type = "skill"
+path = "addons/sql/skills/querying-db"
+description = "Read schema.txt then query via postgres MCP. Ships with schema.txt.template scaffold."
+tags = ["sql", "postgres"]
+
+[[artifacts]]
+id = "migration"
+type = "skill"
+path = "addons/sql/skills/migration"
+description = "/migration — scaffold for creating idempotent DB migrations (user fills in their toolchain)"
+tags = ["sql", "database"]
+
 [presets]
 minimal = ["bash-safety", "file-safety", "code-reviewer", "executing-actions-with-care"]
 base-only = ["@tag:base"]
 python = ["@preset:base-only", "python-reviewer", "ruff", "python-coding-style", "python-testing", "python-security", "python-patterns"]
 typescript = ["@preset:base-only", "typescript-reviewer", "biome", "svelte-check", "typescript-coding-style", "typescript-testing", "typescript-security", "typescript-patterns"]
+sql = ["@preset:base-only", "sql-reviewer", "mcp-postgres-safety", "sql-safety", "querying-db", "migration"]
