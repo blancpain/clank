@@ -57,4 +57,12 @@ description = "Postgres database integrity auditor — schema drift, gaps, dupli
 tags = ["base", "review", "postgres"]
 requires_mcp = ["postgres"]
 
+[[artifacts]]
+id = "bash-safety"
+type = "hook"
+path = "base/hooks/pretooluse-bash-safety.sh"
+settings_fragment = "base/settings.fragments/bash-safety.json"
+description = "PreToolUse Bash guardrails — git push reminder, destructive SQL block, rm block, tmux reminder"
+tags = ["base", "safety"]
+
 [presets]
