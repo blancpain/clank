@@ -73,4 +73,13 @@ settings_fragment = "base/settings.fragments/file-safety.json"
 description = "PreToolUse Edit|Write guardrails — blocks destructive DDL in matching files"
 tags = ["base", "safety"]
 
+[[artifacts]]
+id = "stop-review-reminder"
+type = "hook"
+path = "base/hooks/stop-review-reminder.sh"
+settings_fragment = "base/settings.fragments/stop-review-reminder.json"
+description = "Stop hook that reminds you to run code-reviewer on code changes. Installer prompts once before enabling."
+tags = ["base", "review"]
+default = false
+
 [presets]
