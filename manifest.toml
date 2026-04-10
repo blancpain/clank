@@ -346,6 +346,42 @@ path = "addons/go/rules/golang-patterns.md"
 description = "Go idioms — small interfaces, functional options, sync.Once"
 tags = ["go", "patterns"]
 
+[[artifacts]]
+id = "rust-reviewer"
+type = "agent"
+path = "addons/rust/agents/rust-reviewer.md"
+description = "Rust specialist reviewer — ownership, lifetimes, Result/Option, unsafe scrutiny, clippy"
+tags = ["rust", "review"]
+
+[[artifacts]]
+id = "cargo-clippy"
+type = "hook"
+path = "addons/rust/hooks/cargo-clippy-check.sh"
+settings_fragment = "addons/rust/settings.fragments/cargo-clippy.json"
+description = "PostToolUse cargo clippy on edited Rust files"
+tags = ["rust", "lint"]
+
+[[artifacts]]
+id = "rust-coding-style"
+type = "rule"
+path = "addons/rust/rules/rust-coding-style.md"
+description = "Rust coding style — naming, modules, doc comments"
+tags = ["rust", "style"]
+
+[[artifacts]]
+id = "rust-testing"
+type = "rule"
+path = "addons/rust/rules/rust-testing.md"
+description = "Rust testing — unit, integration, property, doctests"
+tags = ["rust", "testing"]
+
+[[artifacts]]
+id = "rust-security"
+type = "rule"
+path = "addons/rust/rules/rust-security.md"
+description = "Rust security — unsafe discipline, cargo audit, bounds checks"
+tags = ["rust", "security"]
+
 [presets]
 minimal = ["bash-safety", "file-safety", "code-reviewer", "executing-actions-with-care"]
 base-only = ["@tag:base"]
@@ -353,3 +389,4 @@ python = ["@preset:base-only", "python-reviewer", "ruff", "python-coding-style",
 typescript = ["@preset:base-only", "typescript-reviewer", "biome", "svelte-check", "typescript-coding-style", "typescript-testing", "typescript-security", "typescript-patterns"]
 sql = ["@preset:base-only", "sql-reviewer", "mcp-postgres-safety", "sql-safety", "querying-db", "migration"]
 go = ["@preset:base-only", "go-reviewer", "golangci-lint", "golang-coding-style", "golang-testing", "golang-security", "golang-patterns"]
+rust = ["@preset:base-only", "rust-reviewer", "cargo-clippy", "rust-coding-style", "rust-testing", "rust-security"]
