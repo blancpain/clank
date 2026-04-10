@@ -104,6 +104,73 @@ def lint_manifest(manifest: Manifest, clank_root: Path) -> list[str]:
     return errors
 
 
+def resolve_selection(
+    manifest: Manifest,
+    preset: str | None = None,
+    include: list[str] | None = None,
+    exclude: list[str] | None = None,
+) -> set[str]:
+    """Resolve a user selection into a flat set of artifact IDs.
+
+    Honors the default=false flag: such artifacts are excluded from
+    @tag/@preset expansion, but explicit --include overrides this.
+    """
+    selected: set[str] = set()
+    explicit_includes = set(include or [])
+
+    if preset:
+        selected |= _expand_preset(manifest, preset)
+
+    for aid in explicit_includes:
+        if aid not in manifest.artifacts:
+            raise ValueError(f"unknown artifact: {aid}")
+        selected.add(aid)
+
+    for aid in exclude or []:
+        selected.discard(aid)
+
+    filtered = set()
+    for aid in selected:
+        if (
+            manifest.artifacts[aid].get("default") is False
+            and aid not in explicit_includes
+        ):
+            continue
+        filtered.add(aid)
+    return filtered
+
+
+def _expand_preset(
+    manifest: Manifest,
+    name: str,
+    _seen: set[str] | None = None,
+) -> set[str]:
+    if _seen is None:
+        _seen = set()
+    if name in _seen:
+        raise ValueError(f"circular preset reference: {name}")
+    if name not in manifest.presets:
+        raise ValueError(f"unknown preset: {name}")
+    _seen = _seen | {name}
+
+    result: set[str] = set()
+    for member in manifest.presets[name]:
+        if member.startswith("@preset:"):
+            result |= _expand_preset(manifest, member[len("@preset:") :], _seen)
+        elif member == "@tag:*":
+            result |= {aid for aid in manifest.artifacts}
+        elif member.startswith("@tag:"):
+            tag = member[len("@tag:") :]
+            result |= {
+                aid for aid, a in manifest.artifacts.items() if tag in a.get("tags", [])
+            }
+        else:
+            if member not in manifest.artifacts:
+                raise ValueError(f"preset {name}: unknown artifact {member}")
+            result.add(member)
+    return result
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="clank",

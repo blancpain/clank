@@ -77,5 +77,42 @@ class TestManifestLint(unittest.TestCase):
         self.assertTrue(any("does not exist" in e for e in errors))
 
 
+class TestSelectionResolution(unittest.TestCase):
+    def setUp(self):
+        self.manifest = install.Manifest.load(FIXTURES / "manifest_valid.toml")
+
+    def test_resolve_preset_minimal(self):
+        selected = install.resolve_selection(self.manifest, preset="minimal")
+        self.assertEqual(selected, {"stub-agent"})
+
+    def test_resolve_tag_star(self):
+        selected = install.resolve_selection(self.manifest, preset="all")
+        self.assertEqual(selected, {"stub-agent", "stub-hook"})
+
+    def test_resolve_include_only(self):
+        selected = install.resolve_selection(self.manifest, include=["stub-hook"])
+        self.assertEqual(selected, {"stub-hook"})
+
+    def test_resolve_preset_plus_include(self):
+        selected = install.resolve_selection(
+            self.manifest, preset="minimal", include=["stub-hook"]
+        )
+        self.assertEqual(selected, {"stub-agent", "stub-hook"})
+
+    def test_resolve_preset_minus_exclude(self):
+        selected = install.resolve_selection(
+            self.manifest, preset="all", exclude=["stub-hook"]
+        )
+        self.assertEqual(selected, {"stub-agent"})
+
+    def test_resolve_unknown_preset_raises(self):
+        with self.assertRaises(ValueError):
+            install.resolve_selection(self.manifest, preset="nonexistent")
+
+    def test_resolve_unknown_include_raises(self):
+        with self.assertRaises(ValueError):
+            install.resolve_selection(self.manifest, include=["nonexistent"])
+
+
 if __name__ == "__main__":
     unittest.main()
