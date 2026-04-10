@@ -174,3 +174,5 @@ description = "Reference list of Claude Code plugins typically installed"
 tags = ["base", "docs"]
 
 [presets]
+minimal = ["bash-safety", "file-safety", "code-reviewer", "executing-actions-with-care"]
+base-only = ["@tag:base"]
