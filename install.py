@@ -527,6 +527,70 @@ def _git_commit(clank_root: Path) -> str:
         return "unknown"
 
 
+CATEGORIES = [
+    ("agent", "Agents"),
+    ("hook", "Hooks"),
+    ("rule", "Rules"),
+    ("skill", "Skills"),
+    ("plugin-doc", "Plugin docs"),
+]
+
+
+def interactive_pick(
+    manifest: Manifest,
+    input_fn: Callable[[str], str] = input,
+    output=None,
+) -> set[str]:
+    """Numbered-list picker grouped by artifact category.
+
+    Prints the categories one at a time with toggleable checkboxes.
+    Accepts: numbers (space- or comma-separated) to toggle, (a)ll, (n)one,
+    (c)ontinue to advance to the next category. Returns the set of
+    selected artifact IDs. Pure stdlib — no curses/termios dependency.
+    """
+    out = output if output is not None else sys.stdout
+    selected: set[str] = set()
+
+    for artifact_type, heading in CATEGORIES:
+        artifacts = sorted(
+            aid
+            for aid, a in manifest.artifacts.items()
+            if a.get("type") == artifact_type
+        )
+        if not artifacts:
+            continue
+        while True:
+            print(f"\n== {heading} ==", file=out)
+            for i, aid in enumerate(artifacts, 1):
+                mark = "x" if aid in selected else " "
+                desc = manifest.artifacts[aid].get("description", "")
+                print(f"  [{mark}] {i:2}. {aid:30} — {desc}", file=out)
+            cmd = (
+                input_fn("Toggle (numbers), (a)ll, (n)one, (c)ontinue > ")
+                .strip()
+                .lower()
+            )
+            if cmd == "c" or cmd == "":
+                break
+            if cmd == "a":
+                selected |= set(artifacts)
+                continue
+            if cmd == "n":
+                selected -= set(artifacts)
+                continue
+            for token in cmd.replace(",", " ").split():
+                if not token.isdigit():
+                    continue
+                idx = int(token)
+                if 1 <= idx <= len(artifacts):
+                    aid = artifacts[idx - 1]
+                    if aid in selected:
+                        selected.discard(aid)
+                    else:
+                        selected.add(aid)
+    return selected
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="clank",
@@ -598,6 +662,11 @@ def main(argv: list[str] | None = None) -> int:
 
     if not args.preset and not include and not args.interactive:
         parser.error("one of --preset, --include, --interactive is required")
+
+    if args.interactive:
+        manifest_for_picker = Manifest.load(manifest_path)
+        picked = interactive_pick(manifest_for_picker)
+        include = sorted(set(include) | picked)
 
     stop_id = "stop-review-reminder"
     manifest_preview = Manifest.load(manifest_path)

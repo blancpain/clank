@@ -1,5 +1,6 @@
 """Tests for install.py."""
 
+import io
 import json
 import subprocess
 import sys
@@ -461,6 +462,36 @@ class TestFullInstall(unittest.TestCase):
         )
         cmds = [h["command"] for h in bash_entry["hooks"]]
         self.assertEqual(len(cmds), len(set(cmds)))
+
+
+class TestInteractivePicker(unittest.TestCase):
+    def setUp(self):
+        self.manifest = install.Manifest.load(FIXTURES / "manifest_valid.toml")
+
+    def test_toggle_and_continue(self):
+        user_input = iter(["1", "c", "", "c", "c", "c"])
+
+        def fake_input(_prompt=""):
+            return next(user_input)
+
+        selected = install.interactive_pick(
+            self.manifest, input_fn=fake_input, output=io.StringIO()
+        )
+        self.assertIn("stub-agent", selected)
+
+    def test_all_then_none(self):
+        # Within each category: "a" adds all, "n" removes all, "c" continues.
+        # With 2 categories populated in the fixture (agents, hooks) we do
+        # (a, n, c) for Agents → empty; then (a, n, c) for Hooks → still empty.
+        user_input = iter(["a", "n", "c", "a", "n", "c"])
+
+        def fake_input(_prompt=""):
+            return next(user_input)
+
+        selected = install.interactive_pick(
+            self.manifest, input_fn=fake_input, output=io.StringIO()
+        )
+        self.assertEqual(selected, set())
 
 
 if __name__ == "__main__":
