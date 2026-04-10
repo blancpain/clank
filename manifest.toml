@@ -173,6 +173,50 @@ path = "base/plugins/plugins.md"
 description = "Reference list of Claude Code plugins typically installed"
 tags = ["base", "docs"]
 
+[[artifacts]]
+id = "python-reviewer"
+type = "agent"
+path = "addons/python/agents/python-reviewer.md"
+description = "Python specialist reviewer — FastAPI, DataFrame, async, pytest"
+tags = ["python", "review"]
+
+[[artifacts]]
+id = "ruff"
+type = "hook"
+path = "addons/python/hooks/ruff-check.sh"
+settings_fragment = "addons/python/settings.fragments/ruff.json"
+description = "PostToolUse ruff check on edited Python files"
+tags = ["python", "lint"]
+
+[[artifacts]]
+id = "python-coding-style"
+type = "rule"
+path = "addons/python/rules/python-coding-style.md"
+description = "Python-specific coding style (naming, typing, pathlib, comprehensions)"
+tags = ["python", "style"]
+
+[[artifacts]]
+id = "python-testing"
+type = "rule"
+path = "addons/python/rules/python-testing.md"
+description = "Python testing patterns — pytest, fixtures, parametrize"
+tags = ["python", "testing"]
+
+[[artifacts]]
+id = "python-security"
+type = "rule"
+path = "addons/python/rules/python-security.md"
+description = "Python security — eval/exec, pickle, yaml.load, subprocess shell=True"
+tags = ["python", "security"]
+
+[[artifacts]]
+id = "python-patterns"
+type = "rule"
+path = "addons/python/rules/python-patterns.md"
+description = "Python idioms — context managers, dataclasses, Enum, generators"
+tags = ["python", "patterns"]
+
 [presets]
 minimal = ["bash-safety", "file-safety", "code-reviewer", "executing-actions-with-care"]
 base-only = ["@tag:base"]
+python = ["@preset:base-only", "python-reviewer", "ruff", "python-coding-style", "python-testing", "python-security", "python-patterns"]
