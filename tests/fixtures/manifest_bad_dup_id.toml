@@ -1,0 +1,15 @@
+version = 1
+
+[[artifacts]]
+id = "dup"
+type = "agent"
+path = "base/agents/stub-agent.md"
+description = "first"
+tags = []
+
+[[artifacts]]
+id = "dup"
+type = "agent"
+path = "base/agents/stub-agent.md"
+description = "second"
+tags = []

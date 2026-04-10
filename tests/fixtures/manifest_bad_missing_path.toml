@@ -1,0 +1,8 @@
+version = 1
+
+[[artifacts]]
+id = "missing"
+type = "agent"
+path = "base/agents/does-not-exist.md"
+description = "references nonexistent file"
+tags = []

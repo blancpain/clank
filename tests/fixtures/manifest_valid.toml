@@ -1,0 +1,21 @@
+version = 1
+
+[[artifacts]]
+id = "stub-agent"
+type = "agent"
+path = "base/agents/stub-agent.md"
+description = "Stub agent for installer tests"
+tags = ["base", "test"]
+
+[[artifacts]]
+id = "stub-hook"
+type = "hook"
+path = "base/hooks/stub-hook.sh"
+settings_fragment = "base/settings.fragments/stub-hook.json"
+description = "Stub hook"
+tags = ["base", "test"]
+
+[presets]
+minimal = ["stub-agent"]
+all = ["@tag:*"]
+test-both = ["stub-agent", "stub-hook"]
