@@ -145,4 +145,32 @@ path = "base/rules/coding-style.md"
 description = "KISS/DRY/YAGNI, file organization, naming, immutability"
 tags = ["base", "style"]
 
+[[artifacts]]
+id = "review"
+type = "skill"
+path = "base/skills/review"
+description = "/review — runs code-reviewer (+ security-reviewer if relevant) on recent changes"
+tags = ["base", "review"]
+
+[[artifacts]]
+id = "smoke-test"
+type = "skill"
+path = "base/skills/smoke-test"
+description = "/smoke-test — pre-flight checklist before running expensive scripts"
+tags = ["base", "process"]
+
+[[artifacts]]
+id = "deploy"
+type = "skill"
+path = "base/skills/deploy"
+description = "/deploy — scaffold skill for deployment (user fills in project-specific commands)"
+tags = ["base", "deploy"]
+
+[[artifacts]]
+id = "plugins-doc"
+type = "plugin-doc"
+path = "base/plugins/plugins.md"
+description = "Reference list of Claude Code plugins typically installed"
+tags = ["base", "docs"]
+
 [presets]
