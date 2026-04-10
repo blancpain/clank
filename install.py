@@ -11,9 +11,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
+import stat
 import sys
 import tomllib
 from pathlib import Path
+from typing import Callable
 
 __version__ = "0.1.0"
 
@@ -117,6 +120,75 @@ def check_target(target: Path) -> None:
     if (target / "manifest.toml").exists() and (target / "base").is_dir():
         raise InstallError(f"refusing to install into clank itself: {target}")
     (target / ".claude").mkdir(exist_ok=True)
+
+
+def copy_artifact(
+    artifact: dict,
+    clank_root: Path,
+    target: Path,
+    on_conflict: Callable[[Path], str],
+) -> bool:
+    """Copy an artifact into target/.claude/.
+
+    Returns True if the artifact was copied, False if skipped.
+    on_conflict(dst) must return "overwrite", "skip", or "abort".
+    Raises InstallError on "abort".
+    """
+    src = clank_root / artifact["path"]
+    dst = _artifact_destination(artifact, target)
+
+    if artifact.get("type") == "skill":
+        return _copy_directory(src, dst, on_conflict)
+    copied = _copy_file(src, dst, on_conflict)
+    if copied and artifact.get("type") == "hook":
+        st = dst.stat()
+        dst.chmod(st.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    return copied
+
+
+def _artifact_destination(artifact: dict, target: Path) -> Path:
+    """Compute where an artifact lands under target/.claude/."""
+    src_path = Path(artifact["path"])
+    parts = src_path.parts
+    if parts[0] == "base":
+        rel = Path(*parts[1:])
+    elif parts[0] == "addons":
+        rel = Path(*parts[2:])
+    else:
+        raise InstallError(
+            f"artifact path must start with base/ or addons/: {src_path}"
+        )
+    return target / ".claude" / rel
+
+
+def _copy_file(src: Path, dst: Path, on_conflict: Callable[[Path], str]) -> bool:
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    if dst.exists():
+        action = on_conflict(dst)
+        if action == "skip":
+            return False
+        if action == "abort":
+            raise InstallError(f"install aborted at {dst}")
+        if action != "overwrite":
+            raise InstallError(f"unknown conflict action: {action}")
+    shutil.copy2(src, dst)
+    return True
+
+
+def _copy_directory(
+    src_dir: Path,
+    dst_dir: Path,
+    on_conflict: Callable[[Path], str],
+) -> bool:
+    any_copied = False
+    for src_file in sorted(src_dir.rglob("*")):
+        if not src_file.is_file():
+            continue
+        rel = src_file.relative_to(src_dir)
+        dst_file = dst_dir / rel
+        if _copy_file(src_file, dst_file, on_conflict):
+            any_copied = True
+    return any_copied
 
 
 def resolve_selection(

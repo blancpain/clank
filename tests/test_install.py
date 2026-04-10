@@ -132,5 +132,62 @@ class TestSafetyChecks(unittest.TestCase):
             self.assertTrue((target / ".claude").is_dir())
 
 
+class TestCopyArtifact(unittest.TestCase):
+    def setUp(self):
+        self.manifest = install.Manifest.load(FIXTURES / "manifest_valid.toml")
+        self.tmp = tempfile.TemporaryDirectory()
+        self.target = Path(self.tmp.name)
+        (self.target / ".claude").mkdir()
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_copy_agent_file(self):
+        install.copy_artifact(
+            self.manifest.artifacts["stub-agent"],
+            FIXTURES,
+            self.target,
+            on_conflict=lambda dst: "overwrite",
+        )
+        dst = self.target / ".claude/agents/stub-agent.md"
+        self.assertTrue(dst.exists())
+        self.assertIn("Stub body", dst.read_text())
+
+    def test_copy_hook_is_executable(self):
+        install.copy_artifact(
+            self.manifest.artifacts["stub-hook"],
+            FIXTURES,
+            self.target,
+            on_conflict=lambda dst: "overwrite",
+        )
+        dst = self.target / ".claude/hooks/stub-hook.sh"
+        self.assertTrue(dst.exists())
+        self.assertTrue(dst.stat().st_mode & 0o111)
+
+    def test_skip_on_conflict(self):
+        dst = self.target / ".claude/agents/stub-agent.md"
+        dst.parent.mkdir(parents=True)
+        dst.write_text("preexisting content")
+        install.copy_artifact(
+            self.manifest.artifacts["stub-agent"],
+            FIXTURES,
+            self.target,
+            on_conflict=lambda dst: "skip",
+        )
+        self.assertEqual(dst.read_text(), "preexisting content")
+
+    def test_overwrite_on_conflict(self):
+        dst = self.target / ".claude/agents/stub-agent.md"
+        dst.parent.mkdir(parents=True)
+        dst.write_text("preexisting content")
+        install.copy_artifact(
+            self.manifest.artifacts["stub-agent"],
+            FIXTURES,
+            self.target,
+            on_conflict=lambda dst: "overwrite",
+        )
+        self.assertIn("Stub body", dst.read_text())
+
+
 if __name__ == "__main__":
     unittest.main()
