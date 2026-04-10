@@ -21,6 +21,11 @@
 
 version = 1
 
-artifacts = []
+[[artifacts]]
+id = "code-reviewer"
+type = "agent"
+path = "base/agents/code-reviewer.md"
+description = "Language-agnostic code reviewer — confidence filtering, severity mapping, AI-code quirks"
+tags = ["base", "review"]
 
 [presets]
