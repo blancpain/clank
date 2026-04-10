@@ -416,6 +416,117 @@ def _unmerge_settings(target: Path, fragment: dict) -> None:
     settings_path.write_text(json.dumps(settings, indent=2) + "\n")
 
 
+def install(
+    manifest_path: Path,
+    clank_root: Path,
+    target: Path,
+    preset: str | None,
+    include: list[str],
+    exclude: list[str],
+    conflict_policy: str,
+    dry_run: bool,
+    stop_hook_opt_in: bool,
+    clank_version: str,
+    clank_commit: str,
+) -> int:
+    """Run the full install flow. Returns an exit code."""
+    manifest = Manifest.load(manifest_path)
+    errors = lint_manifest(manifest, clank_root)
+    if errors:
+        for e in errors:
+            print(f"manifest lint error: {e}", file=sys.stderr)
+        return 2
+
+    try:
+        selected = resolve_selection(
+            manifest, preset=preset, include=include, exclude=exclude
+        )
+    except ValueError as e:
+        print(f"selection error: {e}", file=sys.stderr)
+        return 2
+
+    stop_id = "stop-review-reminder"
+    if (
+        stop_id in manifest.artifacts
+        and stop_hook_opt_in
+        and manifest.artifacts[stop_id].get("default") is False
+    ):
+        selected.add(stop_id)
+
+    if not selected:
+        print("no artifacts selected", file=sys.stderr)
+        return 2
+
+    if not dry_run:
+        check_target(target)
+
+    on_conflict = _conflict_callback(conflict_policy)
+
+    copied_ids: list[str] = []
+    for aid in sorted(selected):
+        artifact = manifest.artifacts[aid]
+        src = clank_root / artifact["path"]
+        dst = _artifact_destination(artifact, target)
+        if dry_run:
+            print(f"[dry-run] copy {src} -> {dst}")
+            copied_ids.append(aid)
+            continue
+        copied = copy_artifact(artifact, clank_root, target, on_conflict)
+        if copied:
+            copied_ids.append(aid)
+
+    settings_path = target / ".claude" / "settings.json"
+    if not dry_run:
+        current = (
+            json.loads(settings_path.read_text())
+            if settings_path.exists()
+            else _seed_settings(clank_root)
+        )
+        for aid in copied_ids:
+            frag_rel = manifest.artifacts[aid].get("settings_fragment")
+            if not frag_rel:
+                continue
+            frag = json.loads((clank_root / frag_rel).read_text())
+            current = merge_settings(current, frag)
+        settings_path.write_text(json.dumps(current, indent=2) + "\n")
+
+    if not dry_run and copied_ids:
+        write_receipt(target, copied_ids, clank_version, clank_commit)
+
+    print(f"installed: {', '.join(copied_ids) if copied_ids else '(nothing)'}")
+    return 0
+
+
+def _conflict_callback(policy: str) -> Callable[[Path], str]:
+    if policy == "overwrite":
+        return lambda _dst: "overwrite"
+    if policy == "skip":
+        return lambda _dst: "skip"
+    return lambda _dst: "overwrite"
+
+
+def _seed_settings(clank_root: Path) -> dict:
+    base_settings = clank_root / "base" / "settings.json"
+    if base_settings.exists():
+        return json.loads(base_settings.read_text())
+    return {}
+
+
+def _git_commit(clank_root: Path) -> str:
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(clank_root), "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return result.stdout.strip()[:12]
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return "unknown"
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="clank",
@@ -461,9 +572,66 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    if not args.target and not args.list:
+
+    clank_root = Path(__file__).resolve().parent
+    manifest_path = clank_root / "manifest.toml"
+
+    if args.list:
+        manifest = Manifest.load(manifest_path)
+        for aid, a in sorted(manifest.artifacts.items()):
+            tags = ",".join(a.get("tags", []))
+            print(f"{aid:30} [{a['type']:10}] ({tags}) — {a.get('description', '')}")
+        return 0
+
+    if not args.target:
         parser.error("--target is required unless --list is given")
-    return 0
+
+    if args.uninstall:
+        manifest = Manifest.load(manifest_path)
+        ids = [x.strip() for x in args.uninstall.split(",") if x.strip()]
+        uninstall(manifest, clank_root, args.target, ids)
+        print(f"uninstalled: {', '.join(ids)}")
+        return 0
+
+    include = [x.strip() for x in (args.include or "").split(",") if x.strip()]
+    exclude = [x.strip() for x in (args.exclude or "").split(",") if x.strip()]
+
+    if not args.preset and not include and not args.interactive:
+        parser.error("one of --preset, --include, --interactive is required")
+
+    stop_id = "stop-review-reminder"
+    manifest_preview = Manifest.load(manifest_path)
+    stop_hook_opt_in = False
+    if (
+        stop_id in manifest_preview.artifacts
+        and stop_id not in include
+        and not args.force
+        and not args.dry_run
+    ):
+        answer = (
+            input(
+                "Include the stop hook that reminds you to run code-reviewer "
+                "on code changes? [y/N] "
+            )
+            .strip()
+            .lower()
+        )
+        stop_hook_opt_in = answer == "y"
+
+    policy = "overwrite" if args.force else "interactive"
+    return install(
+        manifest_path=manifest_path,
+        clank_root=clank_root,
+        target=args.target,
+        preset=args.preset,
+        include=include,
+        exclude=exclude,
+        conflict_policy=policy,
+        dry_run=args.dry_run,
+        stop_hook_opt_in=stop_hook_opt_in,
+        clank_version=__version__,
+        clank_commit=_git_commit(clank_root),
+    )
 
 
 if __name__ == "__main__":

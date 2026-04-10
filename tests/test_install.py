@@ -369,5 +369,99 @@ class TestUninstall(unittest.TestCase):
         self.assertNotIn("$CLAUDE_PROJECT_DIR/.claude/hooks/stub-hook.sh", all_cmds)
 
 
+class TestFullInstall(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.target = Path(self.tmp.name)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_install_preset_minimal_clean(self):
+        install.install(
+            manifest_path=FIXTURES / "manifest_valid.toml",
+            clank_root=FIXTURES,
+            target=self.target,
+            preset="minimal",
+            include=[],
+            exclude=[],
+            conflict_policy="overwrite",
+            dry_run=False,
+            stop_hook_opt_in=False,
+            clank_version="test",
+            clank_commit="testcommit",
+        )
+        self.assertTrue((self.target / ".claude/agents/stub-agent.md").exists())
+        receipt = install.read_receipt(self.target)
+        self.assertEqual(receipt["artifacts"], ["stub-agent"])
+
+    def test_install_over_existing_preserves_unrelated(self):
+        (self.target / ".claude").mkdir()
+        preexisting = {
+            "hooks": {
+                "PreToolUse": [
+                    {
+                        "matcher": "Read",
+                        "hooks": [{"type": "command", "command": "/unrelated.sh"}],
+                    }
+                ]
+            },
+            "permissions": {"allow": ["Bash(echo hi)"]},
+            "enabledPlugins": {"existing-plugin": True},
+        }
+        (self.target / ".claude/settings.json").write_text(
+            json.dumps(preexisting, indent=2)
+        )
+
+        install.install(
+            manifest_path=FIXTURES / "manifest_valid.toml",
+            clank_root=FIXTURES,
+            target=self.target,
+            preset="test-both",
+            include=[],
+            exclude=[],
+            conflict_policy="overwrite",
+            dry_run=False,
+            stop_hook_opt_in=False,
+            clank_version="test",
+            clank_commit="testcommit",
+        )
+
+        settings = json.loads((self.target / ".claude/settings.json").read_text())
+        read_entry = next(
+            e for e in settings["hooks"]["PreToolUse"] if e["matcher"] == "Read"
+        )
+        self.assertEqual(read_entry["hooks"][0]["command"], "/unrelated.sh")
+        self.assertIn("Bash(echo hi)", settings["permissions"]["allow"])
+        self.assertEqual(settings["enabledPlugins"]["existing-plugin"], True)
+        bash_entry = next(
+            e for e in settings["hooks"]["PreToolUse"] if e["matcher"] == "Bash"
+        )
+        cmds = [h["command"] for h in bash_entry["hooks"]]
+        self.assertIn("$CLAUDE_PROJECT_DIR/.claude/hooks/stub-hook.sh", cmds)
+
+    def test_install_idempotent(self):
+        for _ in range(2):
+            install.install(
+                manifest_path=FIXTURES / "manifest_valid.toml",
+                clank_root=FIXTURES,
+                target=self.target,
+                preset="test-both",
+                include=[],
+                exclude=[],
+                conflict_policy="overwrite",
+                dry_run=False,
+                stop_hook_opt_in=False,
+                clank_version="test",
+                clank_commit="testcommit",
+            )
+        settings = json.loads((self.target / ".claude/settings.json").read_text())
+        bash_entry = next(
+            e for e in settings["hooks"]["PreToolUse"] if e["matcher"] == "Bash"
+        )
+        cmds = [h["command"] for h in bash_entry["hooks"]]
+        self.assertEqual(len(cmds), len(set(cmds)))
+
+
 if __name__ == "__main__":
     unittest.main()
