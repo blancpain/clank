@@ -104,6 +104,21 @@ def lint_manifest(manifest: Manifest, clank_root: Path) -> list[str]:
     return errors
 
 
+class InstallError(Exception):
+    """Raised when the installer cannot proceed safely."""
+
+
+def check_target(target: Path) -> None:
+    """Validate the target directory and create .claude/ if missing."""
+    if not target.exists():
+        raise InstallError(f"target does not exist: {target}")
+    if not target.is_dir():
+        raise InstallError(f"target is not a directory: {target}")
+    if (target / "manifest.toml").exists() and (target / "base").is_dir():
+        raise InstallError(f"refusing to install into clank itself: {target}")
+    (target / ".claude").mkdir(exist_ok=True)
+
+
 def resolve_selection(
     manifest: Manifest,
     preset: str | None = None,

@@ -2,6 +2,7 @@
 
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -112,6 +113,23 @@ class TestSelectionResolution(unittest.TestCase):
     def test_resolve_unknown_include_raises(self):
         with self.assertRaises(ValueError):
             install.resolve_selection(self.manifest, include=["nonexistent"])
+
+
+class TestSafetyChecks(unittest.TestCase):
+    def test_nonexistent_target_raises(self):
+        with self.assertRaises(install.InstallError):
+            install.check_target(Path("/nonexistent/path/to/target"))
+
+    def test_target_is_clank_itself_raises(self):
+        with self.assertRaises(install.InstallError) as ctx:
+            install.check_target(CLANK_ROOT)
+        self.assertIn("clank itself", str(ctx.exception))
+
+    def test_valid_target_creates_claude_dir(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            install.check_target(target)
+            self.assertTrue((target / ".claude").is_dir())
 
 
 if __name__ == "__main__":
