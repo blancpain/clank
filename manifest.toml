@@ -216,7 +216,59 @@ path = "addons/python/rules/python-patterns.md"
 description = "Python idioms — context managers, dataclasses, Enum, generators"
 tags = ["python", "patterns"]
 
+[[artifacts]]
+id = "typescript-reviewer"
+type = "agent"
+path = "addons/typescript/agents/typescript-reviewer.md"
+description = "TypeScript/JavaScript specialist reviewer — types, hooks, promises, Next.js, ESM"
+tags = ["typescript", "javascript", "review"]
+
+[[artifacts]]
+id = "biome"
+type = "hook"
+path = "addons/typescript/hooks/biome-check.sh"
+settings_fragment = "addons/typescript/settings.fragments/biome.json"
+description = "PostToolUse biome check on edited TS/JS/Svelte files"
+tags = ["typescript", "lint"]
+
+[[artifacts]]
+id = "svelte-check"
+type = "hook"
+path = "addons/typescript/hooks/svelte-check.sh"
+settings_fragment = "addons/typescript/settings.fragments/svelte-check.json"
+description = "PostToolUse svelte-check on .svelte files. Inert on non-Svelte projects."
+tags = ["typescript", "svelte", "lint"]
+
+[[artifacts]]
+id = "typescript-coding-style"
+type = "rule"
+path = "addons/typescript/rules/typescript-coding-style.md"
+description = "TypeScript-specific coding style"
+tags = ["typescript", "style"]
+
+[[artifacts]]
+id = "typescript-testing"
+type = "rule"
+path = "addons/typescript/rules/typescript-testing.md"
+description = "TypeScript testing patterns — vitest, jest, RTL"
+tags = ["typescript", "testing"]
+
+[[artifacts]]
+id = "typescript-security"
+type = "rule"
+path = "addons/typescript/rules/typescript-security.md"
+description = "TypeScript security — XSS, prototype pollution, eval, innerHTML"
+tags = ["typescript", "security"]
+
+[[artifacts]]
+id = "typescript-patterns"
+type = "rule"
+path = "addons/typescript/rules/typescript-patterns.md"
+description = "TypeScript idioms — discriminated unions, branded types, exhaustive switches"
+tags = ["typescript", "patterns"]
+
 [presets]
 minimal = ["bash-safety", "file-safety", "code-reviewer", "executing-actions-with-care"]
 base-only = ["@tag:base"]
 python = ["@preset:base-only", "python-reviewer", "ruff", "python-coding-style", "python-testing", "python-security", "python-patterns"]
+typescript = ["@preset:base-only", "typescript-reviewer", "biome", "svelte-check", "typescript-coding-style", "typescript-testing", "typescript-security", "typescript-patterns"]
