@@ -82,4 +82,67 @@ description = "Stop hook that reminds you to run code-reviewer on code changes. 
 tags = ["base", "review"]
 default = false
 
+[[artifacts]]
+id = "code-review"
+type = "rule"
+path = "base/rules/code-review.md"
+description = "When and how to conduct code review"
+tags = ["base", "review", "process"]
+
+[[artifacts]]
+id = "long-running-scripts"
+type = "rule"
+path = "base/rules/long-running-scripts.md"
+description = "Smoke-test and optimize before running long scripts"
+tags = ["base", "process"]
+
+[[artifacts]]
+id = "no-inline-comments"
+type = "rule"
+path = "base/rules/no-inline-comments.md"
+description = "Avoid comments inside python -c multiline strings (bash security heuristic)"
+tags = ["base", "safety"]
+
+[[artifacts]]
+id = "update-agent-memory"
+type = "rule"
+path = "base/rules/update-agent-memory.md"
+description = "Update agent memory after resolving issues they surfaced"
+tags = ["base", "process"]
+
+[[artifacts]]
+id = "use-project-code-reviewer"
+type = "rule"
+path = "base/rules/use-project-code-reviewer.md"
+description = "Prefer the project's own code-reviewer agent over generic reviewers"
+tags = ["base", "review"]
+
+[[artifacts]]
+id = "executing-actions-with-care"
+type = "rule"
+path = "base/rules/executing-actions-with-care.md"
+description = "Reversibility, blast radius, and confirmation discipline for risky actions"
+tags = ["base", "safety"]
+
+[[artifacts]]
+id = "agents"
+type = "rule"
+path = "base/rules/agents.md"
+description = "Index of available agents and when to delegate"
+tags = ["base", "agents"]
+
+[[artifacts]]
+id = "testing"
+type = "rule"
+path = "base/rules/testing.md"
+description = "TDD workflow, AAA pattern, descriptive test names"
+tags = ["base", "testing"]
+
+[[artifacts]]
+id = "coding-style"
+type = "rule"
+path = "base/rules/coding-style.md"
+description = "KISS/DRY/YAGNI, file organization, naming, immutability"
+tags = ["base", "style"]
+
 [presets]
