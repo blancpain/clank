@@ -390,3 +390,7 @@ typescript = ["@preset:base-only", "typescript-reviewer", "biome", "svelte-check
 sql = ["@preset:base-only", "sql-reviewer", "mcp-postgres-safety", "sql-safety", "querying-db", "migration"]
 go = ["@preset:base-only", "go-reviewer", "golangci-lint", "golang-coding-style", "golang-testing", "golang-security", "golang-patterns"]
 rust = ["@preset:base-only", "rust-reviewer", "cargo-clippy", "rust-coding-style", "rust-testing", "rust-security"]
+python-sql = ["@preset:python", "@preset:sql"]
+typescript-sql = ["@preset:typescript", "@preset:sql"]
+fullstack-python = ["@preset:python", "@preset:typescript", "@preset:sql"]
+all = ["@tag:*"]
