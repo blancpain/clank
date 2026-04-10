@@ -49,4 +49,12 @@ path = "base/agents/doc-updater.md"
 description = "Reports stale sections in project docs relative to recent code changes. Read-only."
 tags = ["base", "docs"]
 
+[[artifacts]]
+id = "database-reviewer"
+type = "agent"
+path = "base/agents/database-reviewer.md"
+description = "Postgres database integrity auditor — schema drift, gaps, duplicates, FK integrity, operational health"
+tags = ["base", "review", "postgres"]
+requires_mcp = ["postgres"]
+
 [presets]
