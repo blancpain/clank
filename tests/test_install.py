@@ -292,5 +292,33 @@ class TestSettingsMerge(unittest.TestCase):
         )
 
 
+class TestReceipt(unittest.TestCase):
+    def test_write_and_read_receipt(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            (target / ".claude").mkdir()
+            install.write_receipt(
+                target,
+                artifacts=["stub-agent", "stub-hook"],
+                clank_version="0.1.0",
+                clank_commit="abc123",
+            )
+            receipt = install.read_receipt(target)
+            self.assertEqual(
+                sorted(receipt["artifacts"]),
+                ["stub-agent", "stub-hook"],
+            )
+            self.assertEqual(receipt["clank_version"], "0.1.0")
+            self.assertEqual(receipt["clank_commit"], "abc123")
+            self.assertIn("installed_at", receipt)
+
+    def test_read_receipt_missing_returns_empty(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            (target / ".claude").mkdir()
+            receipt = install.read_receipt(target)
+            self.assertEqual(receipt, {"artifacts": []})
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -16,6 +16,7 @@ import shutil
 import stat
 import sys
 import tomllib
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
@@ -295,6 +296,34 @@ def merge_settings(target: dict, fragment: dict) -> dict:
                 target_list.append(item)
 
     return result
+
+
+RECEIPT_NAME = ".clank-installed.json"
+
+
+def write_receipt(
+    target: Path,
+    artifacts: list[str],
+    clank_version: str,
+    clank_commit: str,
+) -> None:
+    existing = read_receipt(target)
+    merged = sorted(set(existing.get("artifacts", [])) | set(artifacts))
+    receipt = {
+        "clank_version": clank_version,
+        "clank_commit": clank_commit,
+        "installed_at": datetime.now(timezone.utc).isoformat(),
+        "target": str(target.resolve()),
+        "artifacts": merged,
+    }
+    (target / ".claude" / RECEIPT_NAME).write_text(json.dumps(receipt, indent=2) + "\n")
+
+
+def read_receipt(target: Path) -> dict:
+    path = target / ".claude" / RECEIPT_NAME
+    if not path.exists():
+        return {"artifacts": []}
+    return json.loads(path.read_text())
 
 
 def build_parser() -> argparse.ArgumentParser:
