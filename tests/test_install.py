@@ -189,5 +189,108 @@ class TestCopyArtifact(unittest.TestCase):
         self.assertIn("Stub body", dst.read_text())
 
 
+class TestSettingsMerge(unittest.TestCase):
+    def test_merge_into_empty(self):
+        target = {}
+        fragment = {
+            "hooks": {
+                "PreToolUse": [
+                    {
+                        "matcher": "Bash",
+                        "hooks": [{"type": "command", "command": "/a.sh"}],
+                    }
+                ]
+            }
+        }
+        result = install.merge_settings(target, fragment)
+        self.assertEqual(result["hooks"]["PreToolUse"][0]["matcher"], "Bash")
+        self.assertEqual(
+            result["hooks"]["PreToolUse"][0]["hooks"][0]["command"], "/a.sh"
+        )
+
+    def test_merge_append_to_existing_matcher(self):
+        target = {
+            "hooks": {
+                "PreToolUse": [
+                    {
+                        "matcher": "Bash",
+                        "hooks": [{"type": "command", "command": "/existing.sh"}],
+                    }
+                ]
+            }
+        }
+        fragment = {
+            "hooks": {
+                "PreToolUse": [
+                    {
+                        "matcher": "Bash",
+                        "hooks": [{"type": "command", "command": "/new.sh"}],
+                    }
+                ]
+            }
+        }
+        result = install.merge_settings(target, fragment)
+        cmds = [h["command"] for h in result["hooks"]["PreToolUse"][0]["hooks"]]
+        self.assertEqual(cmds, ["/existing.sh", "/new.sh"])
+
+    def test_merge_dedupes_by_command(self):
+        target = {
+            "hooks": {
+                "PreToolUse": [
+                    {
+                        "matcher": "Bash",
+                        "hooks": [{"type": "command", "command": "/a.sh"}],
+                    }
+                ]
+            }
+        }
+        fragment = {
+            "hooks": {
+                "PreToolUse": [
+                    {
+                        "matcher": "Bash",
+                        "hooks": [{"type": "command", "command": "/a.sh"}],
+                    }
+                ]
+            }
+        }
+        result = install.merge_settings(target, fragment)
+        hooks = result["hooks"]["PreToolUse"][0]["hooks"]
+        self.assertEqual(len(hooks), 1)
+
+    def test_merge_new_matcher(self):
+        target = {
+            "hooks": {
+                "PreToolUse": [
+                    {
+                        "matcher": "Bash",
+                        "hooks": [{"type": "command", "command": "/a.sh"}],
+                    }
+                ]
+            }
+        }
+        fragment = {
+            "hooks": {
+                "PreToolUse": [
+                    {
+                        "matcher": "Edit|Write",
+                        "hooks": [{"type": "command", "command": "/b.sh"}],
+                    }
+                ]
+            }
+        }
+        result = install.merge_settings(target, fragment)
+        self.assertEqual(len(result["hooks"]["PreToolUse"]), 2)
+
+    def test_merge_permissions_allow_union(self):
+        target = {"permissions": {"allow": ["Bash(ls:*)"]}}
+        fragment = {"permissions": {"allow": ["Bash(git status)", "Bash(ls:*)"]}}
+        result = install.merge_settings(target, fragment)
+        self.assertEqual(
+            sorted(result["permissions"]["allow"]),
+            ["Bash(git status)", "Bash(ls:*)"],
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -10,6 +10,7 @@ See docs/install.md for full reference.
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import shutil
 import stat
@@ -255,6 +256,44 @@ def _expand_preset(
             if member not in manifest.artifacts:
                 raise ValueError(f"preset {name}: unknown artifact {member}")
             result.add(member)
+    return result
+
+
+def merge_settings(target: dict, fragment: dict) -> dict:
+    """Deep-merge fragment into target. Target wins on scalar conflicts.
+
+    Hook arrays merge by `matcher`; within a matched group, hooks dedupe
+    by `command`. permissions.allow and permissions.deny set-union.
+    """
+    result = copy.deepcopy(target)
+
+    for event, frag_entries in (fragment.get("hooks") or {}).items():
+        target_entries = result.setdefault("hooks", {}).setdefault(event, [])
+        for frag_entry in frag_entries:
+            matcher = frag_entry.get("matcher")
+            existing = next(
+                (e for e in target_entries if e.get("matcher") == matcher),
+                None,
+            )
+            if existing is None:
+                target_entries.append(copy.deepcopy(frag_entry))
+                continue
+            existing_hooks = existing.setdefault("hooks", [])
+            existing_cmds = {h.get("command") for h in existing_hooks}
+            for frag_hook in frag_entry.get("hooks", []):
+                if frag_hook.get("command") not in existing_cmds:
+                    existing_hooks.append(copy.deepcopy(frag_hook))
+                    existing_cmds.add(frag_hook.get("command"))
+
+    for perm_key in ("allow", "deny"):
+        frag_list = (fragment.get("permissions") or {}).get(perm_key)
+        if frag_list is None:
+            continue
+        target_list = result.setdefault("permissions", {}).setdefault(perm_key, [])
+        for item in frag_list:
+            if item not in target_list:
+                target_list.append(item)
+
     return result
 
 
