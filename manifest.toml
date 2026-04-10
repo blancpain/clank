@@ -303,9 +303,53 @@ path = "addons/sql/skills/migration"
 description = "/migration — scaffold for creating idempotent DB migrations (user fills in their toolchain)"
 tags = ["sql", "database"]
 
+[[artifacts]]
+id = "go-reviewer"
+type = "agent"
+path = "addons/go/agents/go-reviewer.md"
+description = "Go specialist reviewer — error wrapping, context, goroutine leaks, channel safety"
+tags = ["go", "review"]
+
+[[artifacts]]
+id = "golangci-lint"
+type = "hook"
+path = "addons/go/hooks/golangci-lint-check.sh"
+settings_fragment = "addons/go/settings.fragments/golangci-lint.json"
+description = "PostToolUse golangci-lint on edited Go files"
+tags = ["go", "lint"]
+
+[[artifacts]]
+id = "golang-coding-style"
+type = "rule"
+path = "addons/go/rules/golang-coding-style.md"
+description = "Go coding style — naming, package layout, errors"
+tags = ["go", "style"]
+
+[[artifacts]]
+id = "golang-testing"
+type = "rule"
+path = "addons/go/rules/golang-testing.md"
+description = "Go testing — table-driven tests, t.Parallel, golden files"
+tags = ["go", "testing"]
+
+[[artifacts]]
+id = "golang-security"
+type = "rule"
+path = "addons/go/rules/golang-security.md"
+description = "Go security — crypto/rand, sql injection, goroutine leaks"
+tags = ["go", "security"]
+
+[[artifacts]]
+id = "golang-patterns"
+type = "rule"
+path = "addons/go/rules/golang-patterns.md"
+description = "Go idioms — small interfaces, functional options, sync.Once"
+tags = ["go", "patterns"]
+
 [presets]
 minimal = ["bash-safety", "file-safety", "code-reviewer", "executing-actions-with-care"]
 base-only = ["@tag:base"]
 python = ["@preset:base-only", "python-reviewer", "ruff", "python-coding-style", "python-testing", "python-security", "python-patterns"]
 typescript = ["@preset:base-only", "typescript-reviewer", "biome", "svelte-check", "typescript-coding-style", "typescript-testing", "typescript-security", "typescript-patterns"]
 sql = ["@preset:base-only", "sql-reviewer", "mcp-postgres-safety", "sql-safety", "querying-db", "migration"]
+go = ["@preset:base-only", "go-reviewer", "golangci-lint", "golang-coding-style", "golang-testing", "golang-security", "golang-patterns"]
