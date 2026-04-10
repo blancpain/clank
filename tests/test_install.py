@@ -1,5 +1,6 @@
 """Tests for install.py."""
 
+import json
 import subprocess
 import sys
 import tempfile
@@ -318,6 +319,54 @@ class TestReceipt(unittest.TestCase):
             (target / ".claude").mkdir()
             receipt = install.read_receipt(target)
             self.assertEqual(receipt, {"artifacts": []})
+
+
+class TestUninstall(unittest.TestCase):
+    def setUp(self):
+        self.manifest = install.Manifest.load(FIXTURES / "manifest_valid.toml")
+        self.tmp = tempfile.TemporaryDirectory()
+        self.target = Path(self.tmp.name)
+        (self.target / ".claude").mkdir()
+        for aid in ["stub-agent", "stub-hook"]:
+            install.copy_artifact(
+                self.manifest.artifacts[aid],
+                FIXTURES,
+                self.target,
+                on_conflict=lambda dst: "overwrite",
+            )
+        frag = json.loads(
+            (FIXTURES / "base/settings.fragments/stub-hook.json").read_text()
+        )
+        target_settings = install.merge_settings({}, frag)
+        (self.target / ".claude/settings.json").write_text(
+            json.dumps(target_settings, indent=2)
+        )
+        install.write_receipt(self.target, ["stub-agent", "stub-hook"], "0.1.0", "test")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_uninstall_removes_file(self):
+        install.uninstall(self.manifest, FIXTURES, self.target, ["stub-agent"])
+        self.assertFalse((self.target / ".claude/agents/stub-agent.md").exists())
+
+    def test_uninstall_updates_receipt(self):
+        install.uninstall(self.manifest, FIXTURES, self.target, ["stub-agent"])
+        receipt = install.read_receipt(self.target)
+        self.assertEqual(receipt["artifacts"], ["stub-hook"])
+
+    def test_uninstall_strips_settings_fragment(self):
+        install.uninstall(self.manifest, FIXTURES, self.target, ["stub-hook"])
+        settings = json.loads((self.target / ".claude/settings.json").read_text())
+        bash_hooks = [
+            e
+            for e in settings.get("hooks", {}).get("PreToolUse", [])
+            if e.get("matcher") == "Bash"
+        ]
+        all_cmds = []
+        for e in bash_hooks:
+            all_cmds.extend(h["command"] for h in e.get("hooks", []))
+        self.assertNotIn("$CLAUDE_PROJECT_DIR/.claude/hooks/stub-hook.sh", all_cmds)
 
 
 if __name__ == "__main__":

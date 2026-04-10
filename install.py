@@ -326,6 +326,96 @@ def read_receipt(target: Path) -> dict:
     return json.loads(path.read_text())
 
 
+def uninstall(
+    manifest: Manifest,
+    clank_root: Path,
+    target: Path,
+    artifact_ids: list[str],
+) -> None:
+    """Remove listed artifacts from the target and update the receipt."""
+    receipt = read_receipt(target)
+    installed = set(receipt.get("artifacts", []))
+
+    for aid in artifact_ids:
+        if aid not in manifest.artifacts:
+            raise InstallError(f"unknown artifact: {aid}")
+        artifact = manifest.artifacts[aid]
+        dst = _artifact_destination(artifact, target)
+
+        if artifact.get("type") == "skill":
+            if dst.is_dir():
+                shutil.rmtree(dst)
+        elif dst.exists():
+            dst.unlink()
+
+        frag_rel = artifact.get("settings_fragment")
+        if frag_rel:
+            frag = json.loads((clank_root / frag_rel).read_text())
+            _unmerge_settings(target, frag)
+
+        installed.discard(aid)
+
+    if installed:
+        write_receipt(
+            target,
+            sorted(installed),
+            receipt.get("clank_version", __version__),
+            receipt.get("clank_commit", "unknown"),
+        )
+        # write_receipt unions with existing, so overwrite the artifacts field cleanly:
+        receipt_path = target / ".claude" / RECEIPT_NAME
+        data = json.loads(receipt_path.read_text())
+        data["artifacts"] = sorted(installed)
+        receipt_path.write_text(json.dumps(data, indent=2) + "\n")
+    else:
+        receipt_path = target / ".claude" / RECEIPT_NAME
+        if receipt_path.exists():
+            receipt_path.unlink()
+
+
+def _unmerge_settings(target: Path, fragment: dict) -> None:
+    settings_path = target / ".claude" / "settings.json"
+    if not settings_path.exists():
+        return
+    settings = json.loads(settings_path.read_text())
+
+    for event, frag_entries in (fragment.get("hooks") or {}).items():
+        target_entries = settings.get("hooks", {}).get(event, [])
+        for frag_entry in frag_entries:
+            matcher = frag_entry.get("matcher")
+            target_entry = next(
+                (e for e in target_entries if e.get("matcher") == matcher),
+                None,
+            )
+            if target_entry is None:
+                continue
+            frag_cmds = {h.get("command") for h in frag_entry.get("hooks", [])}
+            target_entry["hooks"] = [
+                h
+                for h in target_entry.get("hooks", [])
+                if h.get("command") not in frag_cmds
+            ]
+            if not target_entry["hooks"]:
+                target_entries.remove(target_entry)
+        if not target_entries:
+            settings["hooks"].pop(event, None)
+    if not settings.get("hooks"):
+        settings.pop("hooks", None)
+
+    for perm_key in ("allow", "deny"):
+        frag_list = (fragment.get("permissions") or {}).get(perm_key, [])
+        target_list = settings.get("permissions", {}).get(perm_key, [])
+        settings.setdefault("permissions", {})[perm_key] = [
+            x for x in target_list if x not in frag_list
+        ]
+        if not settings["permissions"][perm_key]:
+            settings["permissions"].pop(perm_key)
+    if settings.get("permissions") == {}:
+        settings.pop("permissions")
+
+    settings_path.write_text(json.dumps(settings, indent=2) + "\n")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="clank",
