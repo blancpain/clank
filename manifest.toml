@@ -65,4 +65,12 @@ settings_fragment = "base/settings.fragments/bash-safety.json"
 description = "PreToolUse Bash guardrails — git push reminder, destructive SQL block, rm block, tmux reminder"
 tags = ["base", "safety"]
 
+[[artifacts]]
+id = "file-safety"
+type = "hook"
+path = "base/hooks/pretooluse-file-safety.sh"
+settings_fragment = "base/settings.fragments/file-safety.json"
+description = "PreToolUse Edit|Write guardrails — blocks destructive DDL in matching files"
+tags = ["base", "safety"]
+
 [presets]
