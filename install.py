@@ -670,11 +670,17 @@ def fzf_pick(manifest: Manifest) -> set[str] | None:
                     "--prompt=clank> ",
                     f"--header={heading} — SPACE toggle · Ctrl-A toggle all "
                     "· ENTER confirm · ESC abort",
-                    # space toggles + moves to next row for rapid tapping;
-                    # Ctrl-A toggles all visible rows in the category. bare
-                    # `a` isn't usable because it'd conflict with typing `a`
-                    # to fuzzy-filter.
-                    "--bind=space:toggle+down,ctrl-a:toggle-all",
+                    # fzf 0.71's default marker is '┃' (thin vertical bar),
+                    # which is almost invisible in many terminals. Force an
+                    # ASCII marker so selected rows are obvious.
+                    "--marker=*",
+                    "--pointer=>",
+                    # SPACE toggles current row and advances (rapid-tap to
+                    # select consecutive rows). Ctrl-A toggles all visible
+                    # rows; bare `a` isn't usable because it'd conflict
+                    # with typing `a` to fuzzy-filter.
+                    "--bind=space:toggle-down",
+                    "--bind=ctrl-a:toggle-all",
                 ],
                 input="\n".join(lines),
                 capture_output=True,
