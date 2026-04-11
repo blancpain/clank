@@ -577,6 +577,16 @@ def _seed_settings(clank_root: Path) -> dict:
 
 
 def _git_commit(clank_root: Path) -> str:
+    # install.sh drops a sidecar .clank-ref file with the fetched git ref
+    # (branch/tag/sha) after extracting the tarball, so tarball installs
+    # don't log "unknown" in the receipt. Honor it here without requiring a
+    # user-facing CLI flag on install.py.
+    sidecar = clank_root / ".clank-ref"
+    if sidecar.is_file():
+        value = sidecar.read_text().strip()
+        if value:
+            return value
+
     import subprocess
 
     try:

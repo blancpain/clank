@@ -10,6 +10,10 @@ venv/
 tests/tmp/
 tests/.clank-test-*/
 
+# install.sh drops this sidecar after extracting a tarball so install.py
+# can record the fetched ref in the receipt. Never belongs in a git clone.
+.clank-ref
+
 # Editor noise
 .vscode/
 .idea/

@@ -9,12 +9,19 @@ clank packages the Claude Code configuration patterns that actually work in prod
 ## Quickstart
 
 ```bash
+curl -fsSL https://raw.githubusercontent.com/blancpain/clank/main/install.sh \
+  | sh -s -- --target ~/repos/new-project --preset python-sql
+```
+
+That fetches the latest `main`, copies every artifact for Python + SQL into `~/repos/new-project/.claude/`, merges hook entries into `settings.json`, and writes a receipt at `~/repos/new-project/.claude/.clank-installed.json`. Every `install.py` flag works after the `--`; pin to a specific ref with `CLANK_REF=<branch|tag|sha>` in the environment.
+
+Prefer a local checkout? Clone and run `install.py` directly — same result:
+
+```bash
 git clone git@github.com:blancpain/clank.git
 cd clank
 ./install.py --target ~/repos/new-project --preset python-sql
 ```
-
-That copies every artifact for Python + SQL into `~/repos/new-project/.claude/`, merges hook entries into `settings.json`, and writes a receipt at `~/repos/new-project/.claude/.clank-installed.json`.
 
 See [docs/install.md](docs/install.md) for the full flag reference.
 
