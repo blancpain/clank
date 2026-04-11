@@ -622,62 +622,80 @@ CATEGORIES = [
 
 
 def fzf_pick(manifest: Manifest) -> set[str] | None:
-    """Multi-select artifact picker backed by fzf.
+    """Per-category fzf picker, one "page" per category.
 
-    Returns the set of selected artifact IDs, or None if fzf is not on
-    PATH — callers should fall back to interactive_pick() in that case.
-    Raises InstallError if the user aborts (ESC / Ctrl-C) or if fzf exits
-    with a genuine error.
+    Walks the user through each CATEGORY in sequence (Agents → Hooks →
+    Rules → Skills → Plugin docs), opening fzf with that category's
+    artifacts. SPACE toggles the highlighted row and advances, Ctrl-A
+    toggles all rows in the current category, ENTER confirms this page's
+    selections and advances to the next, ESC aborts the whole install.
 
-    fzf reads the manifest-derived list from its stdin (a pipe set up by
-    subprocess) but draws its TUI against /dev/tty directly, so this works
-    fine under `curl | sh` where install.sh has already redirected python's
-    stdin to /dev/tty.
+    Returns the union of selections across all categories, or None if fzf
+    is not on PATH (callers should fall back to interactive_pick() in that
+    case). Raises InstallError on user abort or fzf error.
+
+    fzf reads each category's list from its stdin (subprocess pipe) but
+    draws its TUI against /dev/tty directly, so this works under `curl | sh`
+    where install.sh has already redirected python's stdin to /dev/tty.
     """
     if not shutil.which("fzf"):
         return None
 
     import subprocess
 
-    # Fixed-width columns keep the list visually aligned. The first
-    # whitespace-delimited token on each line is the artifact ID, which is
-    # what we parse back out of fzf's stdout after selection.
-    lines = [
-        f"{aid:30}  {manifest.artifacts[aid]['type']:10}  "
-        f"{manifest.artifacts[aid].get('description', '')}"
-        for aid in sorted(manifest.artifacts)
-    ]
-
-    try:
-        result = subprocess.run(
-            [
-                "fzf",
-                "--multi",
-                "--reverse",
-                "--height=80%",
-                "--prompt=clank> ",
-                "--header=TAB select · ENTER confirm · ESC abort",
-            ],
-            input="\n".join(lines),
-            capture_output=True,
-            text=True,
-            check=False,
+    selected: set[str] = set()
+    for artifact_type, heading in CATEGORIES:
+        artifacts_in_cat = sorted(
+            aid
+            for aid, a in manifest.artifacts.items()
+            if a.get("type") == artifact_type
         )
-    except FileNotFoundError:
-        return None
+        if not artifacts_in_cat:
+            continue
 
-    if result.returncode == 130:
-        raise InstallError("selection aborted")
-    if result.returncode not in (0, 1):
-        raise InstallError(
-            f"fzf exited with code {result.returncode}: {result.stderr.strip()}"
-        )
+        # One row per artifact in this category. Column layout: <id> <desc>.
+        # Each category is its own page so the type column would be noise.
+        lines = [
+            f"{aid:30}  {manifest.artifacts[aid].get('description', '') or ''}"
+            for aid in artifacts_in_cat
+        ]
 
-    return {
-        line.split(None, 1)[0]
-        for line in result.stdout.splitlines()
-        if line.strip()
-    }
+        try:
+            result = subprocess.run(
+                [
+                    "fzf",
+                    "--multi",
+                    "--reverse",
+                    "--height=80%",
+                    "--prompt=clank> ",
+                    f"--header={heading} — SPACE toggle · Ctrl-A toggle all "
+                    "· ENTER confirm · ESC abort",
+                    # space toggles + moves to next row for rapid tapping;
+                    # Ctrl-A toggles all visible rows in the category. bare
+                    # `a` isn't usable because it'd conflict with typing `a`
+                    # to fuzzy-filter.
+                    "--bind=space:toggle+down,ctrl-a:toggle-all",
+                ],
+                input="\n".join(lines),
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        except FileNotFoundError:
+            return None
+
+        if result.returncode == 130:
+            raise InstallError("selection aborted")
+        if result.returncode not in (0, 1):
+            raise InstallError(
+                f"fzf exited with code {result.returncode}: {result.stderr.strip()}"
+            )
+
+        for line in result.stdout.splitlines():
+            if line.strip():
+                selected.add(line.split(None, 1)[0])
+
+    return selected
 
 
 def interactive_pick(
