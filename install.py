@@ -668,19 +668,23 @@ def fzf_pick(manifest: Manifest) -> set[str] | None:
                     "--reverse",
                     "--height=80%",
                     "--prompt=clank> ",
-                    f"--header={heading} — SPACE toggle · Ctrl-A toggle all "
+                    f"--header={heading} — SPACE toggle · Alt-A toggle all "
                     "· ENTER confirm · ESC abort",
-                    # fzf 0.71's default marker is '┃' (thin vertical bar),
-                    # which is almost invisible in many terminals. Force an
-                    # ASCII marker so selected rows are obvious.
-                    "--marker=*",
+                    # ☑ (U+2611 BALLOT BOX WITH CHECK) renders as a crisp
+                    # checkbox glyph on selected rows. fzf only draws the
+                    # marker on selected rows, not unselected ones — so
+                    # `[x]`/`[ ]` on every row isn't achievable via fzf and
+                    # would need a curses picker instead. fzf 0.71's default
+                    # marker '┃' is nearly invisible, so we always override.
+                    "--marker=☑",
                     "--pointer=>",
-                    # SPACE toggles current row and advances (rapid-tap to
-                    # select consecutive rows). Ctrl-A toggles all visible
-                    # rows; bare `a` isn't usable because it'd conflict
-                    # with typing `a` to fuzzy-filter.
+                    # SPACE toggles the current row and advances (rapid-tap
+                    # to select consecutive rows). Alt-A toggles all visible
+                    # rows in the current category. Avoid Ctrl-A: it's
+                    # commonly bound as the tmux prefix. Bare `a` would
+                    # conflict with typing `a` to fuzzy-filter.
                     "--bind=space:toggle-down",
-                    "--bind=ctrl-a:toggle-all",
+                    "--bind=alt-a:toggle-all",
                 ],
                 input="\n".join(lines),
                 capture_output=True,
@@ -802,6 +806,19 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Thin wrapper around _main_impl so any InstallError raised deep in the
+    # install flow (fzf abort, target validation, conflict abort, etc.)
+    # surfaces as a clean `clank: <message>` line instead of a Python
+    # traceback. Any other exception type is still a bug and keeps its
+    # traceback for debugging.
+    try:
+        return _main_impl(argv)
+    except InstallError as e:
+        print(f"clank: {e}", file=sys.stderr)
+        return 1
+
+
+def _main_impl(argv: list[str] | None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
