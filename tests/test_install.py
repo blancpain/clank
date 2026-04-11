@@ -514,43 +514,17 @@ class TestInteractivePicker(unittest.TestCase):
         self.assertEqual(selected, set())
 
 
-class TestFzfPick(unittest.TestCase):
+class TestCursesPicker(unittest.TestCase):
     def setUp(self):
         self.manifest = install.Manifest.load(FIXTURES / "manifest_valid.toml")
 
-    def test_returns_none_when_fzf_not_on_path(self):
-        # When fzf isn't installed, fzf_pick returns None so main() can
-        # fall back to the stdlib numbered picker.
-        with mock.patch("install.shutil.which", return_value=None):
-            self.assertIsNone(install.fzf_pick(self.manifest))
-
-    def test_parses_selected_ids_from_fzf_output(self):
-        # fzf emits one line per selection, padded to the input format
-        # (id in first column). fzf_pick should parse the first whitespace
-        # token on each line as the artifact ID.
-        fake_stdout = (
-            "stub-agent                      agent       a stub agent\n"
-            "stub-hook                       hook        a stub hook\n"
-        )
-        fake_result = subprocess.CompletedProcess(
-            args=[], returncode=0, stdout=fake_stdout, stderr=""
-        )
-        with mock.patch("install.shutil.which", return_value="/usr/bin/fzf"), \
-                mock.patch("subprocess.run", return_value=fake_result):
-            picked = install.fzf_pick(self.manifest)
-        self.assertEqual(picked, {"stub-agent", "stub-hook"})
-
-    def test_raises_on_user_abort(self):
-        # fzf exit code 130 = user hit ESC / Ctrl-C. Should raise
-        # InstallError rather than silently installing nothing.
-        fake_result = subprocess.CompletedProcess(
-            args=[], returncode=130, stdout="", stderr=""
-        )
-        with mock.patch("install.shutil.which", return_value="/usr/bin/fzf"), \
-                mock.patch("subprocess.run", return_value=fake_result):
-            with self.assertRaises(install.InstallError) as ctx:
-                install.fzf_pick(self.manifest)
-            self.assertIn("aborted", str(ctx.exception))
+    def test_returns_none_when_curses_unavailable(self):
+        # When curses can't be imported (exotic platforms, Windows without
+        # windows-curses), curses_pick returns None so main() falls back
+        # to the stdlib numbered picker. We simulate by poisoning the
+        # curses entry in sys.modules so `import curses` raises.
+        with mock.patch.dict(sys.modules, {"curses": None}):
+            self.assertIsNone(install.curses_pick(self.manifest))
 
 
 if __name__ == "__main__":

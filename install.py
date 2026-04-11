@@ -621,91 +621,145 @@ CATEGORIES = [
 ]
 
 
-def fzf_pick(manifest: Manifest) -> set[str] | None:
-    """Per-category fzf picker, one "page" per category.
+def curses_pick(manifest: Manifest) -> set[str] | None:
+    """Per-category curses checkbox picker, one page per category.
 
     Walks the user through each CATEGORY in sequence (Agents → Hooks →
-    Rules → Skills → Plugin docs), opening fzf with that category's
-    artifacts. SPACE toggles the highlighted row and advances, Ctrl-A
-    toggles all rows in the current category, ENTER confirms this page's
-    selections and advances to the next, ESC aborts the whole install.
+    Rules → Skills → Plugin docs). Every row shows a real `[x]` or `[ ]`
+    checkbox. Keybindings:
 
-    Returns the union of selections across all categories, or None if fzf
-    is not on PATH (callers should fall back to interactive_pick() in that
-    case). Raises InstallError on user abort or fzf error.
+      ↑/↓ or j/k  navigate
+      SPACE       toggle current row and advance
+      a / A       toggle all rows in the current category
+      ENTER       confirm this page and advance to the next category
+      ESC or q    abort the whole install
 
-    fzf reads each category's list from its stdin (subprocess pipe) but
-    draws its TUI against /dev/tty directly, so this works under `curl | sh`
-    where install.sh has already redirected python's stdin to /dev/tty.
+    Returns the union of selections across categories, or None if curses
+    is not importable on this platform (callers should fall back to
+    interactive_pick()). Raises InstallError on user abort.
+
+    Implementation notes:
+
+    - curses is in Python's stdlib on macOS/Linux; Windows needs an extra
+      `windows-curses` package which clank doesn't support anyway
+      (install.sh is POSIX-shell-only), so we return None on ImportError
+      and let interactive_pick handle the exotic case.
+    - `curses.wrapper` handles terminal setup/teardown and guarantees
+      endwin() runs even on exceptions, so InstallError raised from
+      inside propagates with the terminal properly restored.
+    - `set_escdelay(25)` makes bare ESC react snappily (default is 1000ms)
+      without breaking arrow-key escape sequences which arrive faster.
     """
-    if not shutil.which("fzf"):
+    try:
+        import curses
+    except ImportError:
         return None
 
-    import subprocess
+    def _picker(stdscr) -> set[str]:
+        curses.curs_set(0)  # hide cursor
+        curses.set_escdelay(25)
+        stdscr.keypad(True)
 
-    selected: set[str] = set()
-    for artifact_type, heading in CATEGORIES:
-        artifacts_in_cat = sorted(
-            aid
-            for aid, a in manifest.artifacts.items()
-            if a.get("type") == artifact_type
-        )
-        if not artifacts_in_cat:
-            continue
-
-        # One row per artifact in this category. Column layout: <id> <desc>.
-        # Each category is its own page so the type column would be noise.
-        lines = [
-            f"{aid:30}  {manifest.artifacts[aid].get('description', '') or ''}"
-            for aid in artifacts_in_cat
+        # Skip empty categories up-front so the page counter in the footer
+        # reflects actual work, not stubs.
+        non_empty_pages = [
+            (
+                artifact_type,
+                heading,
+                sorted(
+                    aid
+                    for aid, a in manifest.artifacts.items()
+                    if a.get("type") == artifact_type
+                ),
+            )
+            for artifact_type, heading in CATEGORIES
         ]
+        non_empty_pages = [p for p in non_empty_pages if p[2]]
+        total_pages = len(non_empty_pages)
 
-        try:
-            result = subprocess.run(
-                [
-                    "fzf",
-                    "--multi",
-                    "--reverse",
-                    "--height=80%",
-                    "--prompt=clank> ",
-                    f"--header={heading} — SPACE toggle · Alt-A toggle all "
-                    "· ENTER confirm · ESC abort",
-                    # ☑ (U+2611 BALLOT BOX WITH CHECK) renders as a crisp
-                    # checkbox glyph on selected rows. fzf only draws the
-                    # marker on selected rows, not unselected ones — so
-                    # `[x]`/`[ ]` on every row isn't achievable via fzf and
-                    # would need a curses picker instead. fzf 0.71's default
-                    # marker '┃' is nearly invisible, so we always override.
-                    "--marker=☑",
-                    "--pointer=>",
-                    # SPACE toggles the current row and advances (rapid-tap
-                    # to select consecutive rows). Alt-A toggles all visible
-                    # rows in the current category. Avoid Ctrl-A: it's
-                    # commonly bound as the tmux prefix. Bare `a` would
-                    # conflict with typing `a` to fuzzy-filter.
-                    "--bind=space:toggle-down",
-                    "--bind=alt-a:toggle-all",
-                ],
-                input="\n".join(lines),
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-        except FileNotFoundError:
-            return None
+        selected: set[str] = set()
 
-        if result.returncode == 130:
-            raise InstallError("selection aborted")
-        if result.returncode not in (0, 1):
-            raise InstallError(
-                f"fzf exited with code {result.returncode}: {result.stderr.strip()}"
-            )
+        for page_idx, (_artifact_type, heading, artifacts_in_cat) in enumerate(
+            non_empty_pages, 1
+        ):
+            current = 0
+            scroll = 0
+            while True:
+                h, w = stdscr.getmaxyx()
+                list_top = 2
+                visible = max(1, h - list_top - 1)
 
-        for line in result.stdout.splitlines():
-            if line.strip():
-                selected.add(line.split(None, 1)[0])
+                # Keep current row within the visible window.
+                if current < scroll:
+                    scroll = current
+                elif current >= scroll + visible:
+                    scroll = current - visible + 1
 
-    return selected
+                stdscr.erase()
+                header = (
+                    f"{heading} — ↑/↓ navigate · SPACE toggle · a "
+                    "toggle all · ENTER confirm · ESC abort"
+                )
+                stdscr.addnstr(0, 0, header[: w - 1], w - 1, curses.A_REVERSE)
+
+                end = min(len(artifacts_in_cat), scroll + visible)
+                for i in range(scroll, end):
+                    aid = artifacts_in_cat[i]
+                    mark = "[x]" if aid in selected else "[ ]"
+                    desc = manifest.artifacts[aid].get("description", "") or ""
+                    line = f" {mark}  {aid:28}  {desc}"
+                    y = list_top + (i - scroll)
+                    attr = curses.A_REVERSE if i == current else curses.A_NORMAL
+                    stdscr.addnstr(y, 0, line[: w - 1], w - 1, attr)
+
+                footer = (
+                    f"  page {page_idx}/{total_pages}  ·  "
+                    f"{len(selected)} selected"
+                )
+                if h > list_top:
+                    stdscr.addnstr(h - 1, 0, footer[: w - 1], w - 1, curses.A_DIM)
+
+                stdscr.refresh()
+
+                key = stdscr.getch()
+
+                if key in (curses.KEY_UP, ord("k")) and current > 0:
+                    current -= 1
+                elif (
+                    key in (curses.KEY_DOWN, ord("j"))
+                    and current < len(artifacts_in_cat) - 1
+                ):
+                    current += 1
+                elif key == ord(" "):
+                    aid = artifacts_in_cat[current]
+                    if aid in selected:
+                        selected.discard(aid)
+                    else:
+                        selected.add(aid)
+                    # Auto-advance after toggle for rapid-tap selection.
+                    if current < len(artifacts_in_cat) - 1:
+                        current += 1
+                elif key in (ord("a"), ord("A")):
+                    all_in_cat = set(artifacts_in_cat)
+                    if all_in_cat.issubset(selected):
+                        selected.difference_update(all_in_cat)
+                    else:
+                        selected.update(all_in_cat)
+                elif key in (curses.KEY_ENTER, 10, 13):
+                    break  # confirm this page, advance to next category
+                elif key in (27, ord("q"), ord("Q")):
+                    raise InstallError("selection aborted")
+                elif key == curses.KEY_RESIZE:
+                    pass  # redraw on next iteration
+
+        return selected
+
+    try:
+        return curses.wrapper(_picker)
+    except curses.error:
+        # Terminal doesn't support curses (too small, bad TERM, etc).
+        # Return None so the caller falls back to interactive_pick.
+        return None
 
 
 def interactive_pick(
@@ -850,9 +904,10 @@ def _main_impl(argv: list[str] | None) -> int:
 
     if args.interactive:
         manifest_for_picker = Manifest.load(manifest_path)
-        picked = fzf_pick(manifest_for_picker)
+        picked = curses_pick(manifest_for_picker)
         if picked is None:
-            # fzf not installed — fall back to the stdlib numbered picker.
+            # curses not available (import failed or terminal too small)
+            # — fall back to the stdlib numbered picker.
             picked = interactive_pick(manifest_for_picker)
         include = sorted(set(include) | picked)
 
