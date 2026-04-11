@@ -678,12 +678,14 @@ def curses_pick(manifest: Manifest) -> set[str] | None:
         total_pages = len(non_empty_pages)
 
         selected: set[str] = set()
+        # Per-page cursor state so navigating ← back to a previously visited
+        # page drops you where you left off instead of resetting to row 0.
+        page_state: dict[int, tuple[int, int]] = {}
 
-        for page_idx, (_artifact_type, heading, artifacts_in_cat) in enumerate(
-            non_empty_pages, 1
-        ):
-            current = 0
-            scroll = 0
+        idx = 0
+        while idx < total_pages:
+            _artifact_type, heading, artifacts_in_cat = non_empty_pages[idx]
+            current, scroll = page_state.get(idx, (0, 0))
             while True:
                 h, w = stdscr.getmaxyx()
                 list_top = 2
@@ -697,8 +699,8 @@ def curses_pick(manifest: Manifest) -> set[str] | None:
 
                 stdscr.erase()
                 header = (
-                    f"{heading} — ↑/↓ navigate · SPACE toggle · a "
-                    "toggle all · ENTER confirm · ESC abort"
+                    f"{heading} — ↑/↓ nav · SPACE toggle · a toggle all"
+                    " · ←/→ page · ENTER confirm · ESC abort"
                 )
                 stdscr.addnstr(0, 0, header[: w - 1], w - 1, curses.A_REVERSE)
 
@@ -713,7 +715,7 @@ def curses_pick(manifest: Manifest) -> set[str] | None:
                     stdscr.addnstr(y, 0, line[: w - 1], w - 1, attr)
 
                 footer = (
-                    f"  page {page_idx}/{total_pages}  ·  "
+                    f"  page {idx + 1}/{total_pages}  ·  "
                     f"{len(selected)} selected"
                 )
                 if h > list_top:
@@ -745,8 +747,26 @@ def curses_pick(manifest: Manifest) -> set[str] | None:
                         selected.difference_update(all_in_cat)
                     else:
                         selected.update(all_in_cat)
-                elif key in (curses.KEY_ENTER, 10, 13):
-                    break  # confirm this page, advance to next category
+                elif key in (curses.KEY_LEFT, ord("h")):
+                    # Back one page. If we're already on the first page,
+                    # silently no-op — nothing to go back to.
+                    if idx > 0:
+                        page_state[idx] = (current, scroll)
+                        idx -= 1
+                        break
+                elif key in (
+                    curses.KEY_RIGHT,
+                    ord("l"),
+                    curses.KEY_ENTER,
+                    10,
+                    13,
+                ):
+                    # Forward one page. If this is the last page, idx
+                    # increments past total_pages and the outer while
+                    # loop exits, returning `selected`.
+                    page_state[idx] = (current, scroll)
+                    idx += 1
+                    break
                 elif key in (27, ord("q"), ord("Q")):
                     raise InstallError("selection aborted")
                 elif key == curses.KEY_RESIZE:
@@ -860,16 +880,22 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    # Thin wrapper around _main_impl so any InstallError raised deep in the
-    # install flow (fzf abort, target validation, conflict abort, etc.)
-    # surfaces as a clean `clank: <message>` line instead of a Python
-    # traceback. Any other exception type is still a bug and keeps its
-    # traceback for debugging.
+    # Thin wrapper around _main_impl so expected user-facing exits surface
+    # as clean `clank: <message>` lines instead of Python tracebacks:
+    #   - InstallError: target validation, conflict abort, curses ESC/q,
+    #     etc. (things we raise ourselves)
+    #   - KeyboardInterrupt: Ctrl-C during curses.getch() or the stdlib
+    #     input() prompts. curses.wrapper has already restored the
+    #     terminal by the time this bubbles up.
+    # Any other exception type is still a bug and keeps its traceback.
     try:
         return _main_impl(argv)
     except InstallError as e:
         print(f"clank: {e}", file=sys.stderr)
         return 1
+    except KeyboardInterrupt:
+        print("clank: aborted", file=sys.stderr)
+        return 130  # conventional SIGINT exit code (128 + 2)
 
 
 def _main_impl(argv: list[str] | None) -> int:
