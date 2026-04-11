@@ -133,6 +133,25 @@ class TestSafetyChecks(unittest.TestCase):
             install.check_target(target)
             self.assertTrue((target / ".claude").is_dir())
 
+    def test_nonexistent_target_with_existing_parent_is_created(self):
+        # First-time `curl | sh` installs into a fresh project dir: the
+        # user shouldn't have to mkdir beforehand. check_target should
+        # create the target when its parent is a directory.
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "new-project"
+            self.assertFalse(target.exists())
+            install.check_target(target)
+            self.assertTrue(target.is_dir())
+            self.assertTrue((target / ".claude").is_dir())
+
+    def test_nonexistent_target_in_dry_run_is_not_created(self):
+        # Dry-run must not touch the filesystem, even for the auto-create
+        # path. The notice is printed to stderr; nothing gets written.
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "preview-only"
+            install.check_target(target, dry_run=True)
+            self.assertFalse(target.exists())
+
 
 class TestCopyArtifact(unittest.TestCase):
     def setUp(self):

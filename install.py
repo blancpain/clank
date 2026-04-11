@@ -113,15 +113,33 @@ class InstallError(Exception):
     """Raised when the installer cannot proceed safely."""
 
 
-def check_target(target: Path) -> None:
-    """Validate the target directory and create .claude/ if missing."""
+def check_target(target: Path, dry_run: bool = False) -> None:
+    """Validate the target directory and create .claude/ if missing.
+
+    If the target itself doesn't exist but its parent is a directory, the
+    target is created — this keeps first-time `curl | sh` installs working
+    without requiring a prior `mkdir`. If neither the target nor its parent
+    exists, the call raises so typo'd paths fail fast. In dry-run mode no
+    filesystem writes happen; a notice is printed to stderr instead.
+    """
     if not target.exists():
-        raise InstallError(f"target does not exist: {target}")
-    if not target.is_dir():
+        if not target.parent.is_dir():
+            raise InstallError(
+                f"target does not exist and its parent is not a directory: {target}"
+            )
+        if dry_run:
+            print(
+                f"[dry-run] would create target directory: {target}",
+                file=sys.stderr,
+            )
+        else:
+            target.mkdir()
+    elif not target.is_dir():
         raise InstallError(f"target is not a directory: {target}")
     if (target / "manifest.toml").exists() and (target / "base").is_dir():
         raise InstallError(f"refusing to install into clank itself: {target}")
-    (target / ".claude").mkdir(exist_ok=True)
+    if not dry_run:
+        (target / ".claude").mkdir(exist_ok=True)
 
 
 def copy_artifact(
@@ -469,16 +487,9 @@ def install(
         print("no artifacts selected", file=sys.stderr)
         return 2
 
-    # Validate the target even in dry-run so the preview is honest. The
-    # .claude/ directory creation is the only mutation skipped in dry-run.
-    if not target.exists():
-        raise InstallError(f"target does not exist: {target}")
-    if not target.is_dir():
-        raise InstallError(f"target is not a directory: {target}")
-    if (target / "manifest.toml").exists() and (target / "base").is_dir():
-        raise InstallError(f"refusing to install into clank itself: {target}")
-    if not dry_run:
-        (target / ".claude").mkdir(exist_ok=True)
+    # Validate the target even in dry-run so the preview is honest. See
+    # check_target() for the nonexistent-target / auto-create semantics.
+    check_target(target, dry_run=dry_run)
 
     on_conflict = _conflict_callback(conflict_policy)
 
