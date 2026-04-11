@@ -678,12 +678,16 @@ def curses_pick(manifest: Manifest) -> set[str] | None:
         total_pages = len(non_empty_pages)
 
         selected: set[str] = set()
-        # Per-page cursor state so navigating ← back to a previously visited
+        # Per-page cursor state so navigating back to a previously visited
         # page drops you where you left off instead of resetting to row 0.
         page_state: dict[int, tuple[int, int]] = {}
 
-        idx = 0
-        while idx < total_pages:
+        def render_category_page(idx: int) -> str:
+            """Render one category page until a navigation key is pressed.
+
+            Returns one of: 'prev', 'next', 'abort'. Mutates `selected`
+            and `page_state` as side effects.
+            """
             _artifact_type, heading, artifacts_in_cat = non_empty_pages[idx]
             current, scroll = page_state.get(idx, (0, 0))
             while True:
@@ -698,9 +702,13 @@ def curses_pick(manifest: Manifest) -> set[str] | None:
                     scroll = current - visible + 1
 
                 stdscr.erase()
+                # Header uses ASCII `<` / `>` for page nav instead of
+                # unicode `←` / `→` because several popular monospace
+                # fonts render the horizontal arrows at different advance
+                # widths, making the left arrow visually smaller.
                 header = (
-                    f"{heading} — ↑/↓ nav · SPACE toggle · a toggle all"
-                    " · ←/→ page · ENTER confirm · ESC abort"
+                    f"{heading} — up/down nav · SPACE toggle · a toggle all"
+                    " · < > page · ENTER confirm · ESC abort"
                 )
                 stdscr.addnstr(0, 0, header[: w - 1], w - 1, curses.A_REVERSE)
 
@@ -722,7 +730,6 @@ def curses_pick(manifest: Manifest) -> set[str] | None:
                     stdscr.addnstr(h - 1, 0, footer[: w - 1], w - 1, curses.A_DIM)
 
                 stdscr.refresh()
-
                 key = stdscr.getch()
 
                 if key in (curses.KEY_UP, ord("k")) and current > 0:
@@ -748,12 +755,8 @@ def curses_pick(manifest: Manifest) -> set[str] | None:
                     else:
                         selected.update(all_in_cat)
                 elif key in (curses.KEY_LEFT, ord("h")):
-                    # Back one page. If we're already on the first page,
-                    # silently no-op — nothing to go back to.
-                    if idx > 0:
-                        page_state[idx] = (current, scroll)
-                        idx -= 1
-                        break
+                    page_state[idx] = (current, scroll)
+                    return "prev"
                 elif key in (
                     curses.KEY_RIGHT,
                     ord("l"),
@@ -761,18 +764,103 @@ def curses_pick(manifest: Manifest) -> set[str] | None:
                     10,
                     13,
                 ):
-                    # Forward one page. If this is the last page, idx
-                    # increments past total_pages and the outer while
-                    # loop exits, returning `selected`.
                     page_state[idx] = (current, scroll)
-                    idx += 1
-                    break
+                    return "next"
                 elif key in (27, ord("q"), ord("Q")):
-                    raise InstallError("selection aborted")
+                    return "abort"
                 elif key == curses.KEY_RESIZE:
-                    pass  # redraw on next iteration
+                    pass
 
-        return selected
+        def render_review_page() -> str:
+            """Render the final review/confirm page.
+
+            Lists every selection grouped by category so the user can
+            double-check before committing. ENTER is the only way to
+            finish — < / h / ← go back to the last category, ESC/q
+            aborts. Returns one of: 'prev', 'finish', 'abort'.
+            """
+            while True:
+                h, w = stdscr.getmaxyx()
+                stdscr.erase()
+                header = (
+                    "Review — up/down scroll · < back · "
+                    "ENTER install · ESC abort"
+                )
+                stdscr.addnstr(0, 0, header[: w - 1], w - 1, curses.A_REVERSE)
+
+                y = 2
+                total_selected = 0
+                for _artifact_type, heading, artifacts_in_cat in non_empty_pages:
+                    picked = [a for a in artifacts_in_cat if a in selected]
+                    total_selected += len(picked)
+                    if y >= h - 1:
+                        continue  # truncate silently on tiny terminals
+                    summary = f"{heading} ({len(picked)})"
+                    stdscr.addnstr(y, 0, summary[: w - 1], w - 1, curses.A_BOLD)
+                    y += 1
+                    if not picked:
+                        if y < h - 1:
+                            stdscr.addnstr(
+                                y, 0, "  (none)"[: w - 1], w - 1, curses.A_DIM
+                            )
+                            y += 1
+                    for aid in picked:
+                        if y >= h - 1:
+                            break
+                        desc = manifest.artifacts[aid].get("description", "") or ""
+                        line = f"  [x]  {aid:28}  {desc}"
+                        stdscr.addnstr(y, 0, line[: w - 1], w - 1)
+                        y += 1
+                    y += 1  # blank line between categories
+
+                if total_selected == 0:
+                    footer = (
+                        "  nothing selected — press < to go back and pick, "
+                        "or ESC to abort"
+                    )
+                else:
+                    footer = (
+                        f"  {total_selected} artifacts selected  ·  "
+                        "press ENTER to install"
+                    )
+                if h > 2:
+                    stdscr.addnstr(h - 1, 0, footer[: w - 1], w - 1, curses.A_DIM)
+
+                stdscr.refresh()
+                key = stdscr.getch()
+
+                if key in (curses.KEY_LEFT, ord("h")):
+                    return "prev"
+                elif key in (curses.KEY_ENTER, 10, 13):
+                    # Only finish if there's at least one selection.
+                    # Empty-selection ENTER is a silent no-op so the user
+                    # can't accidentally install nothing.
+                    if total_selected > 0:
+                        return "finish"
+                elif key in (27, ord("q"), ord("Q")):
+                    return "abort"
+                elif key == curses.KEY_RESIZE:
+                    pass
+
+        # Dispatcher: walk category pages then the review page. Actions
+        # bubble up from the page renderers and mutate `idx`.
+        idx = 0
+        while True:
+            if idx < total_pages:
+                action = render_category_page(idx)
+            else:  # idx == total_pages — the review page
+                action = render_review_page()
+
+            if action == "next":
+                idx += 1  # may move onto the review page
+            elif action == "prev":
+                if idx > 0:
+                    idx -= 1
+                # else: already on first page, silent no-op
+            elif action == "finish":
+                return selected
+            elif action == "abort":
+                raise InstallError("selection aborted")
 
     try:
         return curses.wrapper(_picker)
