@@ -342,7 +342,7 @@ def write_receipt(
     receipt = {
         "clank_version": clank_version,
         "clank_commit": clank_commit,
-        "installed_at": datetime.now(timezone.utc).isoformat(),
+        "installed_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "target": str(target.resolve()),
         "artifacts": merged,
     }
@@ -621,6 +621,65 @@ CATEGORIES = [
 ]
 
 
+def fzf_pick(manifest: Manifest) -> set[str] | None:
+    """Multi-select artifact picker backed by fzf.
+
+    Returns the set of selected artifact IDs, or None if fzf is not on
+    PATH — callers should fall back to interactive_pick() in that case.
+    Raises InstallError if the user aborts (ESC / Ctrl-C) or if fzf exits
+    with a genuine error.
+
+    fzf reads the manifest-derived list from its stdin (a pipe set up by
+    subprocess) but draws its TUI against /dev/tty directly, so this works
+    fine under `curl | sh` where install.sh has already redirected python's
+    stdin to /dev/tty.
+    """
+    if not shutil.which("fzf"):
+        return None
+
+    import subprocess
+
+    # Fixed-width columns keep the list visually aligned. The first
+    # whitespace-delimited token on each line is the artifact ID, which is
+    # what we parse back out of fzf's stdout after selection.
+    lines = [
+        f"{aid:30}  {manifest.artifacts[aid]['type']:10}  "
+        f"{manifest.artifacts[aid].get('description', '')}"
+        for aid in sorted(manifest.artifacts)
+    ]
+
+    try:
+        result = subprocess.run(
+            [
+                "fzf",
+                "--multi",
+                "--reverse",
+                "--height=80%",
+                "--prompt=clank> ",
+                "--header=TAB select · ENTER confirm · ESC abort",
+            ],
+            input="\n".join(lines),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except FileNotFoundError:
+        return None
+
+    if result.returncode == 130:
+        raise InstallError("selection aborted")
+    if result.returncode not in (0, 1):
+        raise InstallError(
+            f"fzf exited with code {result.returncode}: {result.stderr.strip()}"
+        )
+
+    return {
+        line.split(None, 1)[0]
+        for line in result.stdout.splitlines()
+        if line.strip()
+    }
+
+
 def interactive_pick(
     manifest: Manifest,
     input_fn: Callable[[str], str] = input,
@@ -750,7 +809,10 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.interactive:
         manifest_for_picker = Manifest.load(manifest_path)
-        picked = interactive_pick(manifest_for_picker)
+        picked = fzf_pick(manifest_for_picker)
+        if picked is None:
+            # fzf not installed — fall back to the stdlib numbered picker.
+            picked = interactive_pick(manifest_for_picker)
         include = sorted(set(include) | picked)
 
     stop_id = "stop-review-reminder"
