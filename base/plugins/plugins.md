@@ -44,12 +44,14 @@ claude plugin install security-guidance
 
 | Plugin | Description |
 |--------|-------------|
+| `superpowers` | General dev-workflow toolkit — TDD discipline, subagent-driven development, planning/execution skills |
 | `hookify` | Create hooks conversationally — describe a behavior, get a hook generated |
 | `commit-commands` | Git commit workflow — opinionated commit message generation |
 | `frontend-design` | UI design patterns — component scaffolding, accessibility, responsiveness |
 | `feature-dev` | Feature development workflow — planning, scaffolding, and verification |
 
 ```bash
+claude plugin install superpowers
 claude plugin install hookify
 claude plugin install commit-commands
 claude plugin install frontend-design
