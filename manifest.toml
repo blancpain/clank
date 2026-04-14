@@ -181,6 +181,14 @@ description = "Python specialist reviewer — FastAPI, DataFrame, async, pytest"
 tags = ["python", "review"]
 
 [[artifacts]]
+id = "pipeline-validator"
+type = "agent"
+path = "addons/python/agents/pipeline-validator.md"
+description = "Data pipeline auditor — empty-join detection, float→string ID traps, SQL correctness, assertion coverage"
+tags = ["python", "review", "data"]
+requires_mcp = ["postgres"]
+
+[[artifacts]]
 id = "ruff"
 type = "hook"
 path = "addons/python/hooks/ruff-check.sh"
@@ -281,6 +289,14 @@ path = "addons/sql/hooks/pretooluse-mcp-postgres-safety.sh"
 settings_fragment = "addons/sql/settings.fragments/mcp-postgres-safety.json"
 description = "PreToolUse guardrail on mcp__postgres__query — blocks DROP/TRUNCATE/DELETE/UPDATE"
 tags = ["sql", "safety", "postgres"]
+
+[[artifacts]]
+id = "schema-sync-reminder"
+type = "hook"
+path = "addons/sql/hooks/posttooluse-schema-sync-reminder.sh"
+settings_fragment = "addons/sql/settings.fragments/schema-sync-reminder.json"
+description = "PostToolUse reminder to update querying-db/schema.txt when a schema source file is edited. No-ops if the querying-db skill isn't installed."
+tags = ["sql", "process"]
 
 [[artifacts]]
 id = "sql-safety"
@@ -385,9 +401,9 @@ tags = ["rust", "security"]
 [presets]
 minimal = ["bash-safety", "file-safety", "code-reviewer", "executing-actions-with-care"]
 base-only = ["@tag:base"]
-python = ["@preset:base-only", "python-reviewer", "ruff", "python-coding-style", "python-testing", "python-security", "python-patterns"]
+python = ["@preset:base-only", "python-reviewer", "pipeline-validator", "ruff", "python-coding-style", "python-testing", "python-security", "python-patterns"]
 typescript = ["@preset:base-only", "typescript-reviewer", "biome", "svelte-check", "typescript-coding-style", "typescript-testing", "typescript-security", "typescript-patterns"]
-sql = ["@preset:base-only", "sql-reviewer", "mcp-postgres-safety", "sql-safety", "querying-db", "migration"]
+sql = ["@preset:base-only", "sql-reviewer", "mcp-postgres-safety", "schema-sync-reminder", "sql-safety", "querying-db", "migration"]
 go = ["@preset:base-only", "go-reviewer", "golangci-lint", "golang-coding-style", "golang-testing", "golang-security", "golang-patterns"]
 rust = ["@preset:base-only", "rust-reviewer", "cargo-clippy", "rust-coding-style", "rust-testing", "rust-security"]
 python-sql = ["@preset:python", "@preset:sql"]

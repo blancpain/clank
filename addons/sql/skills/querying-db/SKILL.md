@@ -11,6 +11,8 @@ description: Use when running SQL queries, database lookups, or Python scripts t
 
 If `schema.txt` does not exist, see `schema.txt.template` in this skill directory for the expected format. Fill it in and rename it to `schema.txt` before proceeding.
 
+**Keeping schema.txt in sync:** this skill pairs with the `schema-sync-reminder` hook (installed by the sql preset). When a schema source file is edited (`schema.py`, `schema.sql`, migrations, Prisma schema, etc.), the hook blocks with a reminder to update `schema.txt` in the same turn. If you add a new table or column, update both the source and this reference together — stale references cause queries to fail silently.
+
 ## Step 2: Execute
 
 **Prefer the `mcp__postgres__query` tool** (connects via the PostgreSQL MCP server configured in `.mcp.json`). Pass SQL directly — no Python, no Bash, no SSH needed.
