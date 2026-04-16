@@ -782,15 +782,17 @@ class _InteractiveConflictPrompt:
                 return "skip"
 
             lower = answer.lower()
-            if lower in ("", "s", "skip"):
-                return "skip"
-            if lower in ("o", "overwrite"):
-                return "overwrite"
+            # "All" variants must be checked before single-item variants
+            # because "S".lower() == "s" would match single-skip first.
             if answer == "S" or lower == "skip all":
                 self._all = "skip"
                 return "skip"
             if answer == "O" or lower == "overwrite all":
                 self._all = "overwrite"
+                return "overwrite"
+            if lower in ("", "s", "skip"):
+                return "skip"
+            if lower in ("o", "overwrite"):
                 return "overwrite"
             if lower in ("a", "abort"):
                 return "abort"
