@@ -1021,25 +1021,29 @@ def curses_pick(
                 y = 2
                 total_selected = 0
                 for _artifact_type, heading, artifacts_in_cat in non_empty_pages:
-                    picked = [a for a in artifacts_in_cat if a in selected]
-                    total_selected += len(picked)
+                    picked_count = sum(
+                        1 for a in artifacts_in_cat if a in selected
+                    )
+                    total_selected += picked_count
                     if y >= h - 1:
                         continue  # truncate silently on tiny terminals
-                    summary = f"{heading} ({len(picked)})"
+                    summary = (
+                        f"{heading} ({picked_count}/{len(artifacts_in_cat)})"
+                    )
                     stdscr.addnstr(y, 0, summary[: w - 1], w - 1, curses.A_BOLD)
                     y += 1
-                    if not picked:
-                        if y < h - 1:
-                            stdscr.addnstr(
-                                y, 0, "  (none)"[: w - 1], w - 1, curses.A_DIM
-                            )
-                            y += 1
-                    for aid in picked:
+                    for aid in artifacts_in_cat:
                         if y >= h - 1:
                             break
+                        mark = "[x]" if aid in selected else "[ ]"
                         desc = manifest.artifacts[aid].get("description", "") or ""
-                        line = f"  [x]  {aid:28}  {desc}"
-                        stdscr.addnstr(y, 0, line[: w - 1], w - 1)
+                        line = f"  {mark}  {aid:28}  {desc}"
+                        attr = (
+                            curses.A_NORMAL
+                            if aid in selected
+                            else curses.A_DIM
+                        )
+                        stdscr.addnstr(y, 0, line[: w - 1], w - 1, attr)
                         y += 1
                     y += 1  # blank line between categories
 
