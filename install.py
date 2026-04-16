@@ -1098,6 +1098,7 @@ def _main_impl(argv: list[str] | None) -> int:
         and stop_id not in include
         and not args.force
         and not args.dry_run
+        and not args.interactive
     ):
         answer = (
             input(
