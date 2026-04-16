@@ -15,7 +15,16 @@ settings_fragment = "base/settings.fragments/stub-hook.json"
 description = "Stub hook"
 tags = ["base", "test"]
 
+[[artifacts]]
+id = "stub-mcp"
+type = "mcp"
+path = "addons/sql/mcp/stub-mcp-wrapper.sh"
+mcp_fragment = "addons/sql/mcp/mcp-stub.json"
+description = "Stub MCP server for installer tests"
+tags = ["sql", "test"]
+
 [presets]
 minimal = ["stub-agent"]
 all = ["@tag:*"]
 test-both = ["stub-agent", "stub-hook"]
+test-mcp = ["stub-agent", "stub-mcp"]

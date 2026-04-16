@@ -91,7 +91,7 @@ class TestSelectionResolution(unittest.TestCase):
 
     def test_resolve_tag_star(self):
         selected = install.resolve_selection(self.manifest, preset="all")
-        self.assertEqual(selected, {"stub-agent", "stub-hook"})
+        self.assertEqual(selected, {"stub-agent", "stub-hook", "stub-mcp"})
 
     def test_resolve_include_only(self):
         selected = install.resolve_selection(self.manifest, include=["stub-hook"])
@@ -107,7 +107,7 @@ class TestSelectionResolution(unittest.TestCase):
         selected = install.resolve_selection(
             self.manifest, preset="all", exclude=["stub-hook"]
         )
-        self.assertEqual(selected, {"stub-agent"})
+        self.assertEqual(selected, {"stub-agent", "stub-mcp"})
 
     def test_resolve_unknown_preset_raises(self):
         with self.assertRaises(ValueError):
@@ -209,6 +209,17 @@ class TestCopyArtifact(unittest.TestCase):
             on_conflict=lambda dst: "overwrite",
         )
         self.assertIn("Stub body", dst.read_text())
+
+    def test_copy_mcp_is_executable(self):
+        install.copy_artifact(
+            self.manifest.artifacts["stub-mcp"],
+            FIXTURES,
+            self.target,
+            on_conflict=lambda dst: "overwrite",
+        )
+        dst = self.target / ".claude/mcp/stub-mcp-wrapper.sh"
+        self.assertTrue(dst.exists())
+        self.assertTrue(dst.stat().st_mode & 0o111)
 
 
 class TestSettingsMerge(unittest.TestCase):
@@ -314,6 +325,59 @@ class TestSettingsMerge(unittest.TestCase):
         )
 
 
+class TestMcpMerge(unittest.TestCase):
+    def test_merge_into_empty(self):
+        target = {}
+        fragment = {
+            "mcpServers": {
+                "postgres": {"command": "bash", "args": [".claude/mcp/pg.sh"]}
+            }
+        }
+        result = install.merge_mcp(target, fragment)
+        self.assertEqual(result["mcpServers"]["postgres"]["command"], "bash")
+        self.assertEqual(result["mcpServers"]["postgres"]["args"], [".claude/mcp/pg.sh"])
+
+    def test_merge_preserves_existing_server(self):
+        target = {
+            "mcpServers": {
+                "postgres": {"command": "custom", "args": ["--my-flag"]}
+            }
+        }
+        fragment = {
+            "mcpServers": {
+                "postgres": {"command": "bash", "args": [".claude/mcp/pg.sh"]}
+            }
+        }
+        result = install.merge_mcp(target, fragment)
+        # Target wins on key conflict
+        self.assertEqual(result["mcpServers"]["postgres"]["command"], "custom")
+
+    def test_merge_adds_new_server(self):
+        target = {
+            "mcpServers": {
+                "filesystem": {"command": "npx", "args": ["-y", "server-fs"]}
+            }
+        }
+        fragment = {
+            "mcpServers": {
+                "postgres": {"command": "bash", "args": [".claude/mcp/pg.sh"]}
+            }
+        }
+        result = install.merge_mcp(target, fragment)
+        self.assertIn("filesystem", result["mcpServers"])
+        self.assertIn("postgres", result["mcpServers"])
+
+    def test_merge_idempotent(self):
+        fragment = {
+            "mcpServers": {
+                "postgres": {"command": "bash", "args": [".claude/mcp/pg.sh"]}
+            }
+        }
+        result = install.merge_mcp({}, fragment)
+        result2 = install.merge_mcp(result, fragment)
+        self.assertEqual(result, result2)
+
+
 class TestReceipt(unittest.TestCase):
     def test_write_and_read_receipt(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -388,6 +452,55 @@ class TestUninstall(unittest.TestCase):
         for e in bash_hooks:
             all_cmds.extend(h["command"] for h in e.get("hooks", []))
         self.assertNotIn("$CLAUDE_PROJECT_DIR/.claude/hooks/stub-hook.sh", all_cmds)
+
+    def test_uninstall_mcp_removes_server_from_mcp_json(self):
+        # Install the MCP artifact first
+        install.copy_artifact(
+            self.manifest.artifacts["stub-mcp"],
+            FIXTURES,
+            self.target,
+            on_conflict=lambda dst: "overwrite",
+        )
+        mcp_frag = json.loads(
+            (FIXTURES / "addons/sql/mcp/mcp-stub.json").read_text()
+        )
+        mcp_path = self.target / ".mcp.json"
+        mcp_path.write_text(json.dumps(install.merge_mcp({}, mcp_frag), indent=2))
+        install.write_receipt(
+            self.target, ["stub-agent", "stub-hook", "stub-mcp"], "0.1.0", "test"
+        )
+
+        install.uninstall(self.manifest, FIXTURES, self.target, ["stub-mcp"])
+        self.assertFalse(mcp_path.exists())  # empty .mcp.json is deleted
+        self.assertFalse(
+            (self.target / ".claude/mcp/stub-mcp-wrapper.sh").exists()
+        )
+
+    def test_uninstall_mcp_preserves_other_servers(self):
+        # .mcp.json has both a clank-installed server and a user-added one
+        mcp_frag = json.loads(
+            (FIXTURES / "addons/sql/mcp/mcp-stub.json").read_text()
+        )
+        combined = install.merge_mcp(
+            {"mcpServers": {"filesystem": {"command": "npx", "args": ["fs"]}}},
+            mcp_frag,
+        )
+        mcp_path = self.target / ".mcp.json"
+        mcp_path.write_text(json.dumps(combined, indent=2))
+        install.copy_artifact(
+            self.manifest.artifacts["stub-mcp"],
+            FIXTURES,
+            self.target,
+            on_conflict=lambda dst: "overwrite",
+        )
+        install.write_receipt(
+            self.target, ["stub-agent", "stub-hook", "stub-mcp"], "0.1.0", "test"
+        )
+
+        install.uninstall(self.manifest, FIXTURES, self.target, ["stub-mcp"])
+        mcp = json.loads(mcp_path.read_text())
+        self.assertIn("filesystem", mcp["mcpServers"])
+        self.assertNotIn("postgres", mcp.get("mcpServers", {}))
 
 
 class TestFullInstall(unittest.TestCase):
@@ -483,6 +596,73 @@ class TestFullInstall(unittest.TestCase):
         cmds = [h["command"] for h in bash_entry["hooks"]]
         self.assertEqual(len(cmds), len(set(cmds)))
 
+    def test_install_mcp_creates_mcp_json(self):
+        install.install(
+            manifest_path=FIXTURES / "manifest_valid.toml",
+            clank_root=FIXTURES,
+            target=self.target,
+            preset="test-mcp",
+            include=[],
+            exclude=[],
+            conflict_policy="overwrite",
+            dry_run=False,
+            stop_hook_opt_in=False,
+            clank_version="test",
+            clank_commit="testcommit",
+        )
+        # Wrapper script is copied and executable
+        wrapper = self.target / ".claude/mcp/stub-mcp-wrapper.sh"
+        self.assertTrue(wrapper.exists())
+        self.assertTrue(wrapper.stat().st_mode & 0o111)
+        # .mcp.json is created at project root
+        mcp_path = self.target / ".mcp.json"
+        self.assertTrue(mcp_path.exists())
+        mcp = json.loads(mcp_path.read_text())
+        self.assertIn("postgres", mcp["mcpServers"])
+        self.assertEqual(mcp["mcpServers"]["postgres"]["command"], "bash")
+
+    def test_install_mcp_preserves_existing_mcp_json(self):
+        (self.target / ".mcp.json").write_text(
+            json.dumps(
+                {"mcpServers": {"filesystem": {"command": "npx", "args": ["fs"]}}},
+                indent=2,
+            )
+        )
+        install.install(
+            manifest_path=FIXTURES / "manifest_valid.toml",
+            clank_root=FIXTURES,
+            target=self.target,
+            preset="test-mcp",
+            include=[],
+            exclude=[],
+            conflict_policy="overwrite",
+            dry_run=False,
+            stop_hook_opt_in=False,
+            clank_version="test",
+            clank_commit="testcommit",
+        )
+        mcp = json.loads((self.target / ".mcp.json").read_text())
+        self.assertIn("filesystem", mcp["mcpServers"])
+        self.assertIn("postgres", mcp["mcpServers"])
+
+    def test_install_mcp_idempotent(self):
+        for _ in range(2):
+            install.install(
+                manifest_path=FIXTURES / "manifest_valid.toml",
+                clank_root=FIXTURES,
+                target=self.target,
+                preset="test-mcp",
+                include=[],
+                exclude=[],
+                conflict_policy="overwrite",
+                dry_run=False,
+                stop_hook_opt_in=False,
+                clank_version="test",
+                clank_commit="testcommit",
+            )
+        mcp = json.loads((self.target / ".mcp.json").read_text())
+        self.assertEqual(len(mcp["mcpServers"]), 1)
+
 
 class TestInteractivePicker(unittest.TestCase):
     def setUp(self):
@@ -501,9 +681,9 @@ class TestInteractivePicker(unittest.TestCase):
 
     def test_all_then_none(self):
         # Within each category: "a" adds all, "n" removes all, "c" continues.
-        # With 2 categories populated in the fixture (agents, hooks) we do
-        # (a, n, c) for Agents → empty; then (a, n, c) for Hooks → still empty.
-        user_input = iter(["a", "n", "c", "a", "n", "c"])
+        # With 3 categories populated in the fixture (agents, hooks, mcp) we do
+        # (a, n, c) for each → all empty at the end.
+        user_input = iter(["a", "n", "c", "a", "n", "c", "a", "n", "c"])
 
         def fake_input(_prompt=""):
             return next(user_input)
