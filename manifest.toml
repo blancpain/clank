@@ -125,6 +125,13 @@ description = "Reversibility, blast radius, and confirmation discipline for risk
 tags = ["base", "safety"]
 
 [[artifacts]]
+id = "branch-per-feature"
+type = "rule"
+path = "base/rules/branch-per-feature.md"
+description = "Create a new branch before starting any feature/fix — never commit directly to main"
+tags = ["base", "process", "git"]
+
+[[artifacts]]
 id = "agents"
 type = "rule"
 path = "base/rules/agents.md"
