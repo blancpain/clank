@@ -438,12 +438,12 @@ def _generate_agents_rule(
             "",
             "## Immediate Agent Usage",
             "",
-            "No user prompt needed — invoke these automatically when the situation matches:",
+            "Invoke these agents proactively — no user prompt needed:",
             "",
         ]
     )
-    for i, (name, desc) in enumerate(agents, 1):
-        lines.append(f"{i}. Matching work → **{name}** — {desc}")
+    for name, desc in agents:
+        lines.append(f"- **{name}** — {desc}")
 
     lines.extend(
         [
@@ -750,50 +750,69 @@ def _conflict_callback(policy: str) -> Callable[[Path], str]:
     if policy == "skip":
         return lambda _dst: "skip"
     if policy == "interactive":
-        return _interactive_conflict_prompt
+        return _InteractiveConflictPrompt()
     raise InstallError(f"unknown conflict policy: {policy}")
 
 
-def _interactive_conflict_prompt(dst: Path) -> str:
-    """Per-file conflict prompt used when --force is not set."""
-    while True:
-        try:
-            answer = (
-                input(
-                    f"Conflict: {dst} already exists.\n"
-                    "  [s]kip / [o]verwrite / [d]iff / [a]bort > "
-                )
-                .strip()
-                .lower()
-            )
-        except EOFError:
-            # Non-interactive stdin (e.g. tests, CI) — fall through to skip
-            return "skip"
+class _InteractiveConflictPrompt:
+    """Per-file conflict prompt with "apply to all" memory.
 
-        if answer in ("", "s", "skip"):
-            return "skip"
-        if answer in ("o", "overwrite"):
-            return "overwrite"
-        if answer in ("a", "abort"):
-            return "abort"
-        if answer in ("d", "diff"):
+    Callable that behaves like ``Callable[[Path], str]``. Once the user
+    picks "Skip all" or "Overwrite all", subsequent calls return that
+    choice without prompting again.
+    """
+
+    def __init__(self) -> None:
+        self._all: str | None = None
+
+    def __call__(self, dst: Path) -> str:
+        if self._all is not None:
+            return self._all
+        while True:
             try:
-                import subprocess
-
-                result = subprocess.run(
-                    ["head", "-20", str(dst)],
-                    capture_output=True,
-                    text=True,
-                    check=False,
+                answer = (
+                    input(
+                        f"Conflict: {dst} already exists.\n"
+                        "  [s]kip / [o]verwrite / [S]kip all / [O]verwrite all"
+                        " / [d]iff / [a]bort > "
+                    )
+                    .strip()
                 )
-                print(f"--- existing content of {dst.name} (first 20 lines) ---")
-                print(result.stdout)
-                print("---")
-            except Exception as e:
-                print(f"(diff failed: {e})")
-            # Loop and re-prompt
-            continue
-        print(f"Unknown choice: {answer!r}. Pick s/o/d/a.")
+            except EOFError:
+                return "skip"
+
+            lower = answer.lower()
+            if lower in ("", "s", "skip"):
+                return "skip"
+            if lower in ("o", "overwrite"):
+                return "overwrite"
+            if answer == "S" or lower == "skip all":
+                self._all = "skip"
+                return "skip"
+            if answer == "O" or lower == "overwrite all":
+                self._all = "overwrite"
+                return "overwrite"
+            if lower in ("a", "abort"):
+                return "abort"
+            if lower in ("d", "diff"):
+                try:
+                    import subprocess
+
+                    result = subprocess.run(
+                        ["head", "-20", str(dst)],
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                    )
+                    print(
+                        f"--- existing content of {dst.name} (first 20 lines) ---"
+                    )
+                    print(result.stdout)
+                    print("---")
+                except Exception as e:
+                    print(f"(diff failed: {e})")
+                continue
+            print(f"Unknown choice: {answer!r}. Pick s/o/S/O/d/a.")
 
 
 def _seed_settings(clank_root: Path) -> dict:
