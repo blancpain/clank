@@ -306,6 +306,14 @@ description = "SQL safety — destructive DDL discipline, parameterized queries,
 tags = ["sql", "safety"]
 
 [[artifacts]]
+id = "pg-mcp"
+type = "mcp"
+path = "addons/sql/mcp/pg-mcp-wrapper.sh"
+mcp_fragment = "addons/sql/mcp/mcp-postgres.json"
+description = "Postgres MCP server — reads DB_URL from .env, launches @modelcontextprotocol/server-postgres"
+tags = ["sql", "postgres"]
+
+[[artifacts]]
 id = "querying-db"
 type = "skill"
 path = "addons/sql/skills/querying-db"
@@ -403,7 +411,7 @@ minimal = ["bash-safety", "file-safety", "code-reviewer", "executing-actions-wit
 base-only = ["@tag:base"]
 python = ["@preset:base-only", "python-reviewer", "pipeline-validator", "ruff", "python-coding-style", "python-testing", "python-security", "python-patterns"]
 typescript = ["@preset:base-only", "typescript-reviewer", "biome", "svelte-check", "typescript-coding-style", "typescript-testing", "typescript-security", "typescript-patterns"]
-sql = ["@preset:base-only", "sql-reviewer", "mcp-postgres-safety", "schema-sync-reminder", "sql-safety", "querying-db", "migration"]
+sql = ["@preset:base-only", "sql-reviewer", "mcp-postgres-safety", "schema-sync-reminder", "sql-safety", "pg-mcp", "querying-db", "migration"]
 go = ["@preset:base-only", "go-reviewer", "golangci-lint", "golang-coding-style", "golang-testing", "golang-security", "golang-patterns"]
 rust = ["@preset:base-only", "rust-reviewer", "cargo-clippy", "rust-coding-style", "rust-testing", "rust-security"]
 python-sql = ["@preset:python", "@preset:sql"]

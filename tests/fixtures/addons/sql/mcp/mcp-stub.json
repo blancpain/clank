@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "postgres": {
+      "command": "bash",
+      "args": [".claude/mcp/stub-mcp-wrapper.sh"]
+    }
+  }
+}

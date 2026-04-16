@@ -22,7 +22,7 @@ from typing import Callable
 
 __version__ = "0.1.0"
 
-VALID_TYPES = {"agent", "hook", "rule", "skill", "plugin-doc"}
+VALID_TYPES = {"agent", "hook", "rule", "skill", "plugin-doc", "mcp"}
 
 
 class Manifest:
@@ -88,6 +88,17 @@ def lint_manifest(manifest: Manifest, clank_root: Path) -> list[str]:
                     json.loads(frag_path.read_text())
                 except json.JSONDecodeError as e:
                     errors.append(f"{aid}: settings_fragment invalid JSON: {e}")
+
+        mcp_frag = artifact.get("mcp_fragment")
+        if mcp_frag:
+            mcp_frag_path = clank_root / mcp_frag
+            if not mcp_frag_path.exists():
+                errors.append(f"{aid}: mcp_fragment does not exist: {mcp_frag}")
+            else:
+                try:
+                    json.loads(mcp_frag_path.read_text())
+                except json.JSONDecodeError as e:
+                    errors.append(f"{aid}: mcp_fragment invalid JSON: {e}")
 
     known_ids = set(manifest.artifacts.keys())
     preset_names = set(manifest.presets.keys())
@@ -160,7 +171,7 @@ def copy_artifact(
     if artifact.get("type") == "skill":
         return _copy_directory(src, dst, on_conflict)
     copied = _copy_file(src, dst, on_conflict)
-    if copied and artifact.get("type") == "hook":
+    if copied and artifact.get("type") in ("hook", "mcp"):
         st = dst.stat()
         dst.chmod(st.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
     return copied
@@ -328,6 +339,21 @@ def merge_settings(target: dict, fragment: dict) -> dict:
     return result
 
 
+def merge_mcp(target: dict, fragment: dict) -> dict:
+    """Merge an MCP fragment into an existing .mcp.json target dict.
+
+    Adds ``mcpServers`` entries from the fragment. Target entries win on
+    key conflict — if the user already configured a server with the same
+    name, we leave it alone. Idempotent.
+    """
+    result = copy.deepcopy(target)
+    for server_name, server_config in (fragment.get("mcpServers") or {}).items():
+        result.setdefault("mcpServers", {}).setdefault(
+            server_name, copy.deepcopy(server_config)
+        )
+    return result
+
+
 RECEIPT_NAME = ".clank-installed.json"
 
 
@@ -382,6 +408,11 @@ def uninstall(
         if frag_rel:
             frag = json.loads((clank_root / frag_rel).read_text())
             _unmerge_settings(target, frag)
+
+        mcp_frag_rel = artifact.get("mcp_fragment")
+        if mcp_frag_rel:
+            mcp_frag = json.loads((clank_root / mcp_frag_rel).read_text())
+            _unmerge_mcp(target, mcp_frag)
 
         installed.discard(aid)
 
@@ -444,6 +475,23 @@ def _unmerge_settings(target: Path, fragment: dict) -> None:
         settings.pop("permissions")
 
     settings_path.write_text(json.dumps(settings, indent=2) + "\n")
+
+
+def _unmerge_mcp(target: Path, fragment: dict) -> None:
+    """Remove MCP servers defined in *fragment* from target/.mcp.json."""
+    mcp_path = target / ".mcp.json"
+    if not mcp_path.exists():
+        return
+    mcp = json.loads(mcp_path.read_text())
+    servers = mcp.get("mcpServers", {})
+    for server_name in fragment.get("mcpServers") or {}:
+        servers.pop(server_name, None)
+    if not servers:
+        mcp.pop("mcpServers", None)
+    if mcp:
+        mcp_path.write_text(json.dumps(mcp, indent=2) + "\n")
+    else:
+        mcp_path.unlink()
 
 
 def install(
@@ -520,6 +568,22 @@ def install(
             frag = json.loads((clank_root / frag_rel).read_text())
             current = merge_settings(current, frag)
         settings_path.write_text(json.dumps(current, indent=2) + "\n")
+
+        # Merge MCP fragments into <target>/.mcp.json
+        mcp_frags = [
+            manifest.artifacts[aid].get("mcp_fragment")
+            for aid in copied_ids
+            if manifest.artifacts[aid].get("mcp_fragment")
+        ]
+        if mcp_frags:
+            mcp_path = target / ".mcp.json"
+            mcp_current = (
+                json.loads(mcp_path.read_text()) if mcp_path.exists() else {}
+            )
+            for frag_rel in mcp_frags:
+                frag = json.loads((clank_root / frag_rel).read_text())
+                mcp_current = merge_mcp(mcp_current, frag)
+            mcp_path.write_text(json.dumps(mcp_current, indent=2) + "\n")
 
     if not dry_run and copied_ids:
         write_receipt(target, copied_ids, clank_version, clank_commit)
@@ -617,6 +681,7 @@ CATEGORIES = [
     ("hook", "Hooks"),
     ("rule", "Rules"),
     ("skill", "Skills"),
+    ("mcp", "MCP servers"),
     ("plugin-doc", "Plugin docs"),
 ]
 
