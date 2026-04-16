@@ -425,25 +425,15 @@ def _generate_agents_rule(
     lines = [
         "# Agent Orchestration",
         "",
-        "## Available Agents",
+        "**IMPORTANT: You MUST use these agents proactively.** Do not wait for",
+        "the user to ask — invoke the matching agent immediately whenever your",
+        "work falls within an agent's purpose.",
         "",
-        "| Agent | Purpose |",
-        "|-------|---------|",
+        "| Agent | When to invoke |",
+        "|-------|----------------|",
     ]
     for name, desc in agents:
-        lines.append(f"| {name} | {desc} |")
-
-    lines.extend(
-        [
-            "",
-            "## Immediate Agent Usage",
-            "",
-            "Invoke these agents proactively — no user prompt needed:",
-            "",
-        ]
-    )
-    for name, desc in agents:
-        lines.append(f"- **{name}** — {desc}")
+        lines.append(f"| **{name}** | {desc} |")
 
     lines.extend(
         [

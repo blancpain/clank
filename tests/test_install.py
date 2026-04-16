@@ -718,7 +718,7 @@ class TestDynamicAgentsRule(unittest.TestCase):
         # Static placeholder text must be gone
         self.assertNotIn("Static placeholder", content)
         # Dynamic table header must be present
-        self.assertIn("| Agent | Purpose |", content)
+        self.assertIn("| Agent | When to invoke |", content)
 
     def test_agents_md_updates_on_incremental_install(self):
         """Adding agents in a later install regenerates agents.md."""
@@ -775,7 +775,7 @@ class TestDynamicAgentsRule(unittest.TestCase):
         self._install(include=["stub-agent", "agents"])
         content = self._agents_md()
         # stub-agent should appear exactly once in the table
-        table_lines = [l for l in content.splitlines() if l.startswith("| stub-agent ")]
+        table_lines = [l for l in content.splitlines() if "**stub-agent**" in l and l.startswith("|")]
         self.assertEqual(len(table_lines), 1)
 
     def test_custom_agent_without_frontmatter_uses_stem(self):
