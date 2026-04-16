@@ -91,7 +91,10 @@ class TestSelectionResolution(unittest.TestCase):
 
     def test_resolve_tag_star(self):
         selected = install.resolve_selection(self.manifest, preset="all")
-        self.assertEqual(selected, {"stub-agent", "stub-hook", "stub-mcp"})
+        self.assertEqual(
+            selected,
+            {"stub-agent", "stub-agent-2", "agents", "stub-hook", "stub-mcp"},
+        )
 
     def test_resolve_include_only(self):
         selected = install.resolve_selection(self.manifest, include=["stub-hook"])
@@ -107,7 +110,9 @@ class TestSelectionResolution(unittest.TestCase):
         selected = install.resolve_selection(
             self.manifest, preset="all", exclude=["stub-hook"]
         )
-        self.assertEqual(selected, {"stub-agent", "stub-mcp"})
+        self.assertEqual(
+            selected, {"stub-agent", "stub-agent-2", "agents", "stub-mcp"}
+        )
 
     def test_resolve_unknown_preset_raises(self):
         with self.assertRaises(ValueError):
@@ -664,6 +669,194 @@ class TestFullInstall(unittest.TestCase):
         self.assertEqual(len(mcp["mcpServers"]), 1)
 
 
+class TestDynamicAgentsRule(unittest.TestCase):
+    """agents.md is generated dynamically from installed agent artifacts."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.target = Path(self.tmp.name)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _install(self, preset=None, include=None, exclude=None):
+        return install.install(
+            manifest_path=FIXTURES / "manifest_valid.toml",
+            clank_root=FIXTURES,
+            target=self.target,
+            preset=preset,
+            include=include or [],
+            exclude=exclude or [],
+            conflict_policy="overwrite",
+            dry_run=False,
+            stop_hook_opt_in=False,
+            clank_version="test",
+            clank_commit="testcommit",
+        )
+
+    def _agents_md(self):
+        return (self.target / ".claude" / "rules" / "agents.md").read_text()
+
+    def test_agents_md_lists_installed_agents(self):
+        """agents.md table reflects exactly the agents that were installed."""
+        self._install(include=["stub-agent", "agents"])
+        content = self._agents_md()
+        self.assertIn("stub-agent", content)
+        # stub-agent-2 was NOT selected → must NOT appear
+        self.assertNotIn("stub-agent-2", content)
+
+    def test_agents_md_includes_all_agents_when_both_installed(self):
+        self._install(include=["stub-agent", "stub-agent-2", "agents"])
+        content = self._agents_md()
+        self.assertIn("stub-agent", content)
+        self.assertIn("stub-agent-2", content)
+
+    def test_agents_md_overwrites_static_template(self):
+        """The static agents.md template is replaced with dynamic content."""
+        self._install(include=["stub-agent", "agents"])
+        content = self._agents_md()
+        # Static placeholder text must be gone
+        self.assertNotIn("Static placeholder", content)
+        # Dynamic table header must be present
+        self.assertIn("| Agent | Purpose |", content)
+
+    def test_agents_md_updates_on_incremental_install(self):
+        """Adding agents in a later install regenerates agents.md."""
+        self._install(include=["stub-agent", "agents"])
+        content_v1 = self._agents_md()
+        self.assertNotIn("stub-agent-2", content_v1)
+
+        # Second install adds another agent
+        self._install(include=["stub-agent-2"])
+        content_v2 = self._agents_md()
+        self.assertIn("stub-agent", content_v2)
+        self.assertIn("stub-agent-2", content_v2)
+
+    def test_agents_md_updates_on_uninstall(self):
+        """Removing an agent regenerates agents.md without that agent."""
+        self._install(include=["stub-agent", "stub-agent-2", "agents"])
+        manifest = install.Manifest.load(FIXTURES / "manifest_valid.toml")
+        install.uninstall(manifest, FIXTURES, self.target, ["stub-agent-2"])
+        content = self._agents_md()
+        self.assertIn("stub-agent", content)
+        self.assertNotIn("stub-agent-2", content)
+
+    def test_agents_md_removed_when_all_agents_uninstalled(self):
+        """If every agent is uninstalled, agents.md becomes empty and is deleted."""
+        self._install(include=["stub-agent", "agents"])
+        manifest = install.Manifest.load(FIXTURES / "manifest_valid.toml")
+        install.uninstall(manifest, FIXTURES, self.target, ["stub-agent"])
+        self.assertFalse(
+            (self.target / ".claude" / "rules" / "agents.md").exists()
+        )
+
+    def test_agents_md_includes_custom_agents(self):
+        """Manually added agent files appear in the generated agents.md."""
+        self._install(include=["stub-agent", "agents"])
+        # Drop a custom agent into the target by hand
+        custom = self.target / ".claude" / "agents" / "my-custom-agent.md"
+        custom.write_text(
+            "---\n"
+            "name: my-custom-agent\n"
+            "description: A hand-crafted agent\n"
+            "---\n\n"
+            "Custom body.\n"
+        )
+        # Re-install to trigger regeneration
+        self._install(include=["stub-agent", "agents"])
+        content = self._agents_md()
+        self.assertIn("my-custom-agent", content)
+        self.assertIn("A hand-crafted agent", content)
+        # Manifest agent still present
+        self.assertIn("stub-agent", content)
+
+    def test_agents_md_skips_manifest_agents_when_scanning(self):
+        """Manifest-installed agent files are not double-counted from disk scan."""
+        self._install(include=["stub-agent", "agents"])
+        content = self._agents_md()
+        # stub-agent should appear exactly once in the table
+        table_lines = [l for l in content.splitlines() if l.startswith("| stub-agent ")]
+        self.assertEqual(len(table_lines), 1)
+
+    def test_custom_agent_without_frontmatter_uses_stem(self):
+        """Agent files without frontmatter fall back to filename stem."""
+        self._install(include=["stub-agent", "agents"])
+        custom = self.target / ".claude" / "agents" / "bare-agent.md"
+        custom.write_text("No frontmatter here, just a body.\n")
+        self._install(include=["stub-agent", "agents"])
+        content = self._agents_md()
+        self.assertIn("bare-agent", content)
+
+    def test_dry_run_does_not_generate_agents_md(self):
+        """Dry run must not write the generated file."""
+        install.install(
+            manifest_path=FIXTURES / "manifest_valid.toml",
+            clank_root=FIXTURES,
+            target=self.target,
+            preset=None,
+            include=["stub-agent", "agents"],
+            exclude=[],
+            conflict_policy="overwrite",
+            dry_run=True,
+            stop_hook_opt_in=False,
+            clank_version="test",
+            clank_commit="testcommit",
+        )
+        self.assertFalse(
+            (self.target / ".claude" / "rules" / "agents.md").exists()
+        )
+
+
+class TestRefreshAgents(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.target = Path(self.tmp.name)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_refresh_agents_regenerates(self):
+        """--refresh-agents regenerates agents.md from receipt + disk."""
+        # First, do a normal install
+        install.install(
+            manifest_path=FIXTURES / "manifest_valid.toml",
+            clank_root=FIXTURES,
+            target=self.target,
+            preset=None,
+            include=["stub-agent", "agents"],
+            exclude=[],
+            conflict_policy="overwrite",
+            dry_run=False,
+            stop_hook_opt_in=False,
+            clank_version="test",
+            clank_commit="testcommit",
+        )
+        # Drop a custom agent
+        custom = self.target / ".claude" / "agents" / "custom.md"
+        custom.write_text("---\nname: custom\ndescription: My custom agent\n---\n")
+        # Run --refresh-agents via main()
+        rc = install.main(
+            ["--target", str(self.target), "--refresh-agents"]
+        )
+        self.assertEqual(rc, 0)
+        content = (self.target / ".claude" / "rules" / "agents.md").read_text()
+        self.assertIn("stub-agent", content)
+        self.assertIn("custom", content)
+        self.assertIn("My custom agent", content)
+
+    def test_refresh_agents_no_receipt(self):
+        """--refresh-agents on a target with no receipt still scans disk."""
+        (self.target / ".claude" / "agents").mkdir(parents=True)
+        custom = self.target / ".claude" / "agents" / "solo.md"
+        custom.write_text("---\nname: solo\ndescription: Solo agent\n---\n")
+        rc = install.main(
+            ["--target", str(self.target), "--refresh-agents"]
+        )
+        self.assertEqual(rc, 0)
+        content = (self.target / ".claude" / "rules" / "agents.md").read_text()
+        self.assertIn("solo", content)
+
+
 class TestInteractivePicker(unittest.TestCase):
     def setUp(self):
         self.manifest = install.Manifest.load(FIXTURES / "manifest_valid.toml")
@@ -681,9 +874,11 @@ class TestInteractivePicker(unittest.TestCase):
 
     def test_all_then_none(self):
         # Within each category: "a" adds all, "n" removes all, "c" continues.
-        # With 3 categories populated in the fixture (agents, hooks, mcp) we do
-        # (a, n, c) for each → all empty at the end.
-        user_input = iter(["a", "n", "c", "a", "n", "c", "a", "n", "c"])
+        # With 4 categories populated in the fixture (agents, hooks, rules, mcp)
+        # we do (a, n, c) for each → all empty at the end.
+        user_input = iter(
+            ["a", "n", "c", "a", "n", "c", "a", "n", "c", "a", "n", "c"]
+        )
 
         def fake_input(_prompt=""):
             return next(user_input)
@@ -692,6 +887,28 @@ class TestInteractivePicker(unittest.TestCase):
             self.manifest, input_fn=fake_input, output=io.StringIO()
         )
         self.assertEqual(selected, set())
+
+    def test_preselected_artifacts_start_checked(self):
+        """Artifacts from the receipt appear pre-checked in the picker."""
+        # Just press "c" through every category without toggling anything.
+        user_input = iter(["c", "c", "c", "c"])
+
+        def fake_input(_prompt=""):
+            return next(user_input)
+
+        out = io.StringIO()
+        selected = install.interactive_pick(
+            self.manifest,
+            input_fn=fake_input,
+            output=out,
+            preselected={"stub-agent", "stub-hook"},
+        )
+        # Without touching anything, preselected items should be returned
+        self.assertIn("stub-agent", selected)
+        self.assertIn("stub-hook", selected)
+        # The display should show them checked
+        display = out.getvalue()
+        self.assertIn("[x]", display)
 
 
 class TestCursesPicker(unittest.TestCase):

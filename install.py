@@ -354,6 +354,129 @@ def merge_mcp(target: dict, fragment: dict) -> dict:
     return result
 
 
+def _parse_agent_frontmatter(path: Path) -> dict[str, str]:
+    """Extract name and description from an agent .md file's YAML frontmatter.
+
+    Returns {"name": ..., "description": ...} with empty-string defaults.
+    Handles the ``---`` delimited frontmatter that Claude Code agent files use.
+    """
+    result: dict[str, str] = {"name": path.stem, "description": ""}
+    try:
+        text = path.read_text()
+    except OSError:
+        return result
+    if not text.startswith("---"):
+        return result
+    end = text.find("---", 3)
+    if end == -1:
+        return result
+    for line in text[3:end].splitlines():
+        if ":" not in line:
+            continue
+        key, _, value = line.partition(":")
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key in ("name", "description"):
+            result[key] = value
+    return result
+
+
+def _generate_agents_rule(
+    manifest: Manifest,
+    installed_ids: set[str],
+    target: Path | None = None,
+) -> str:
+    """Build rules/agents.md content from installed + discovered agent artifacts.
+
+    Returns the full markdown string, or "" if no agents are found.
+    The generated file replaces the static base/rules/agents.md so the rule
+    always reflects reality — no stale rows for agents the user didn't pick,
+    no missing rows for addon agents they did, and custom agents the user
+    dropped in by hand are picked up too.
+
+    When *target* is provided, ``.claude/agents/*.md`` is scanned for files
+    not covered by the manifest. Their frontmatter is parsed for a name and
+    description so they appear in the table alongside manifest-installed agents.
+    """
+    # 1. Manifest-installed agents: (name, description) from manifest metadata
+    agents: list[tuple[str, str]] = []
+    manifest_agent_files: set[str] = set()
+    for aid in sorted(installed_ids):
+        artifact = manifest.artifacts.get(aid)
+        if not artifact or artifact.get("type") != "agent":
+            continue
+        agents.append((aid, artifact.get("description", "")))
+        # Track the filename so we can skip it when scanning the target dir
+        manifest_agent_files.add(Path(artifact["path"]).name)
+
+    # 2. Discover custom agents the user added manually
+    if target is not None:
+        agents_dir = target / ".claude" / "agents"
+        if agents_dir.is_dir():
+            for md_file in sorted(agents_dir.glob("*.md")):
+                if md_file.name in manifest_agent_files:
+                    continue
+                fm = _parse_agent_frontmatter(md_file)
+                agents.append((fm["name"], fm["description"]))
+
+    if not agents:
+        return ""
+
+    lines = [
+        "# Agent Orchestration",
+        "",
+        "## Available Agents",
+        "",
+        "| Agent | Purpose |",
+        "|-------|---------|",
+    ]
+    for name, desc in agents:
+        lines.append(f"| {name} | {desc} |")
+
+    lines.extend(
+        [
+            "",
+            "## Immediate Agent Usage",
+            "",
+            "No user prompt needed — invoke these automatically when the situation matches:",
+            "",
+        ]
+    )
+    for i, (name, desc) in enumerate(agents, 1):
+        lines.append(f"{i}. Matching work → **{name}** — {desc}")
+
+    lines.extend(
+        [
+            "",
+            "## Parallel Task Execution",
+            "",
+            "Dispatch agents in parallel when their work is independent.",
+            "Multiple Agent tool uses in one assistant message:",
+            "",
+            "```markdown",
+            "# GOOD: Parallel execution",
+            "Launch 2 agents in parallel:",
+            "1. Agent 1: code-reviewer on the diff",
+            "2. Agent 2: security-reviewer on the auth changes",
+            "",
+            "# BAD: Sequential when unnecessary",
+            "First code-reviewer, then wait, then security-reviewer",
+            "```",
+            "",
+            "## Multi-Perspective Analysis",
+            "",
+            "For complex problems, use split-role subagents in parallel:",
+            "- Factual reviewer",
+            "- Senior engineer",
+            "- Security expert",
+            "- Consistency reviewer",
+            "",
+        ]
+    )
+
+    return "\n".join(lines)
+
+
 RECEIPT_NAME = ".clank-installed.json"
 
 
@@ -432,6 +555,20 @@ def uninstall(
         receipt_path = target / ".claude" / RECEIPT_NAME
         if receipt_path.exists():
             receipt_path.unlink()
+
+    # Regenerate agents.md if an agent was removed but the rule itself remains.
+    agents_rule_dst = target / ".claude" / "rules" / "agents.md"
+    removed_agents = any(
+        manifest.artifacts[aid].get("type") == "agent" for aid in artifact_ids
+    )
+    if removed_agents and agents_rule_dst.exists() and "agents" not in artifact_ids:
+        remaining = set(read_receipt(target).get("artifacts", []))
+        content = _generate_agents_rule(manifest, remaining, target)
+        if content:
+            agents_rule_dst.write_text(content)
+        else:
+            # No agents left — remove the now-empty rule
+            agents_rule_dst.unlink()
 
 
 def _unmerge_settings(target: Path, fragment: dict) -> None:
@@ -588,6 +725,21 @@ def install(
     if not dry_run and copied_ids:
         write_receipt(target, copied_ids, clank_version, clank_commit)
 
+    # Regenerate agents.md dynamically based on actually-installed agents.
+    # Triggers when the agents rule itself is installed, OR when new agent
+    # artifacts are added to an existing install that already has the rule.
+    if not dry_run:
+        agents_rule_dst = target / ".claude" / "rules" / "agents.md"
+        new_agents = any(
+            manifest.artifacts[aid].get("type") == "agent" for aid in copied_ids
+        )
+        if "agents" in copied_ids or (agents_rule_dst.exists() and new_agents):
+            all_installed = set(read_receipt(target).get("artifacts", []))
+            content = _generate_agents_rule(manifest, all_installed, target)
+            if content:
+                agents_rule_dst.parent.mkdir(parents=True, exist_ok=True)
+                agents_rule_dst.write_text(content)
+
     print(f"installed: {', '.join(copied_ids) if copied_ids else '(nothing)'}")
     return 0
 
@@ -686,7 +838,9 @@ CATEGORIES = [
 ]
 
 
-def curses_pick(manifest: Manifest) -> set[str] | None:
+def curses_pick(
+    manifest: Manifest, preselected: set[str] | None = None
+) -> set[str] | None:
     """Per-category curses checkbox picker, one page per category.
 
     Walks the user through each CATEGORY in sequence (Agents → Hooks →
@@ -742,7 +896,7 @@ def curses_pick(manifest: Manifest) -> set[str] | None:
         non_empty_pages = [p for p in non_empty_pages if p[2]]
         total_pages = len(non_empty_pages)
 
-        selected: set[str] = set()
+        selected: set[str] = set(preselected or ())
         # Per-page cursor state so navigating back to a previously visited
         # page drops you where you left off instead of resetting to row 0.
         page_state: dict[int, tuple[int, int]] = {}
@@ -939,6 +1093,7 @@ def interactive_pick(
     manifest: Manifest,
     input_fn: Callable[[str], str] = input,
     output=None,
+    preselected: set[str] | None = None,
 ) -> set[str]:
     """Numbered-list picker grouped by artifact category.
 
@@ -946,9 +1101,12 @@ def interactive_pick(
     Accepts: numbers (space- or comma-separated) to toggle, (a)ll, (n)one,
     (c)ontinue to advance to the next category. Returns the set of
     selected artifact IDs. Pure stdlib — no curses/termios dependency.
+
+    When *preselected* is provided, those IDs start checked — handy for
+    re-running the installer on a target that already has artifacts.
     """
     out = output if output is not None else sys.stdout
-    selected: set[str] = set()
+    selected: set[str] = set(preselected or ())
 
     for artifact_type, heading in CATEGORIES:
         artifacts = sorted(
@@ -1025,6 +1183,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Comma-separated artifact IDs to uninstall from --target",
     )
     parser.add_argument(
+        "--refresh-agents",
+        action="store_true",
+        help="Regenerate agents.md from installed + discovered agents, then exit",
+    )
+    parser.add_argument(
         "--version",
         action="version",
         version=f"clank {__version__}",
@@ -1075,6 +1238,39 @@ def _main_impl(argv: list[str] | None) -> int:
         print(f"uninstalled: {', '.join(ids)}")
         return 0
 
+    if args.refresh_agents:
+        manifest = Manifest.load(manifest_path)
+        agents_dst = args.target / ".claude" / "rules" / "agents.md"
+        all_installed = set(read_receipt(args.target).get("artifacts", []))
+        content = _generate_agents_rule(manifest, all_installed, args.target)
+        if content:
+            agents_dst.parent.mkdir(parents=True, exist_ok=True)
+            agents_dst.write_text(content)
+            # Count agents in the generated output
+            agent_count = sum(
+                1 for aid in all_installed
+                if manifest.artifacts.get(aid, {}).get("type") == "agent"
+            )
+            # Count custom agents from disk
+            agents_dir = args.target / ".claude" / "agents"
+            if agents_dir.is_dir():
+                manifest_files = {
+                    Path(manifest.artifacts[aid]["path"]).name
+                    for aid in all_installed
+                    if manifest.artifacts.get(aid, {}).get("type") == "agent"
+                }
+                agent_count += sum(
+                    1
+                    for f in agents_dir.glob("*.md")
+                    if f.name not in manifest_files
+                )
+            print(f"agents.md refreshed ({agent_count} agents)")
+        else:
+            if agents_dst.exists():
+                agents_dst.unlink()
+            print("agents.md removed (no agents found)")
+        return 0
+
     include = [x.strip() for x in (args.include or "").split(",") if x.strip()]
     exclude = [x.strip() for x in (args.exclude or "").split(",") if x.strip()]
 
@@ -1083,11 +1279,15 @@ def _main_impl(argv: list[str] | None) -> int:
 
     if args.interactive:
         manifest_for_picker = Manifest.load(manifest_path)
-        picked = curses_pick(manifest_for_picker)
+        # Pre-check artifacts that are already installed in the target so the
+        # picker reflects current state instead of starting empty.
+        already = set(read_receipt(args.target).get("artifacts", []))
+        preselected = already & set(manifest_for_picker.artifacts)
+        picked = curses_pick(manifest_for_picker, preselected)
         if picked is None:
             # curses not available (import failed or terminal too small)
             # — fall back to the stdlib numbered picker.
-            picked = interactive_pick(manifest_for_picker)
+            picked = interactive_pick(manifest_for_picker, preselected=preselected)
         include = sorted(set(include) | picked)
 
     stop_id = "stop-review-reminder"

@@ -8,6 +8,20 @@ description = "Stub agent for installer tests"
 tags = ["base", "test"]
 
 [[artifacts]]
+id = "stub-agent-2"
+type = "agent"
+path = "base/agents/stub-agent-2.md"
+description = "Second stub agent for installer tests"
+tags = ["base", "test"]
+
+[[artifacts]]
+id = "agents"
+type = "rule"
+path = "base/rules/agents.md"
+description = "Index of available agents and when to delegate"
+tags = ["base", "agents"]
+
+[[artifacts]]
 id = "stub-hook"
 type = "hook"
 path = "base/hooks/stub-hook.sh"
