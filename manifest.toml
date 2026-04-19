@@ -132,6 +132,13 @@ description = "Create a new branch before starting any feature/fix — never com
 tags = ["base", "process", "git"]
 
 [[artifacts]]
+id = "surgical-changes"
+type = "rule"
+path = "base/rules/surgical-changes.md"
+description = "Touch only what the task requires — no adjacent refactors, no deleting pre-existing dead code"
+tags = ["base", "process", "style"]
+
+[[artifacts]]
 id = "agents"
 type = "rule"
 path = "base/rules/agents.md"
