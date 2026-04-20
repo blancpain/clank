@@ -467,6 +467,144 @@ def _generate_agents_rule(
     return "\n".join(lines)
 
 
+END_OF_TURN_BEGIN = "<!-- clank:end-of-turn-review:begin -->"
+END_OF_TURN_END = "<!-- clank:end-of-turn-review:end -->"
+
+# Language-specific reviewer mapping for the end-of-turn table. Each row is
+# (trigger label, reviewer agent id). The reviewer is paired with code-reviewer
+# when both are installed; rows whose reviewer isn't installed are skipped.
+_END_OF_TURN_LANG_ROWS: list[tuple[str, str]] = [
+    ("Any Python file", "python-reviewer"),
+    ("Any TypeScript/JavaScript file", "typescript-reviewer"),
+    ("Any Go file", "go-reviewer"),
+    ("Any Rust file", "rust-reviewer"),
+]
+
+
+def _generate_end_of_turn_review(installed_ids: set[str]) -> str:
+    """Build the 'Before ending a coding turn' CLAUDE.md block.
+
+    Only emits rows whose referenced agents are installed. Returns "" if no
+    review agents are installed at all — the caller should then delete any
+    existing block rather than leave a stale one in place.
+    """
+    rows: list[tuple[str, str]] = []
+    code_reviewer = "code-reviewer" in installed_ids
+
+    for label, reviewer in _END_OF_TURN_LANG_ROWS:
+        if reviewer not in installed_ids:
+            continue
+        launch = (
+            f"`{reviewer}` + `code-reviewer`" if code_reviewer else f"`{reviewer}`"
+        )
+        rows.append((label, launch))
+
+    if "sql-reviewer" in installed_ids:
+        rows.append(
+            ("SQL in any form (raw strings, ORM, migrations)", "`sql-reviewer`")
+        )
+    if "database-reviewer" in installed_ids and "sql-reviewer" in installed_ids:
+        rows.append(
+            (
+                "SQL migration or schema-changing files",
+                "`database-reviewer` + `sql-reviewer`",
+            )
+        )
+    if "pipeline-validator" in installed_ids:
+        rows.append(
+            (
+                "Data-pipeline code (joins, DataFrames, ETL)",
+                "`pipeline-validator`",
+            )
+        )
+    if "security-reviewer" in installed_ids:
+        rows.append(
+            (
+                "Security-sensitive changes (auth, crypto, deserialization, input parsing)",
+                "`security-reviewer`",
+            )
+        )
+    if code_reviewer:
+        rows.append(("Any other code change", "`code-reviewer`"))
+
+    if not rows:
+        return ""
+
+    lines = [
+        "### Before ending a coding turn",
+        "",
+        "If the turn modified code, launch the applicable review agents in the",
+        "background before concluding your reply. Run in parallel when triggers",
+        "overlap.",
+        "",
+        "| If you touched | Launch |",
+        "|---|---|",
+    ]
+    for label, launch in rows:
+        lines.append(f"| {label} | {launch} |")
+
+    lines.extend(
+        [
+            "",
+            "Trivial edits — single-line typo fixes, wording-only doc changes,",
+            "constant renames — do not require review.",
+        ]
+    )
+
+    footer_notes: list[str] = []
+    if "docs-researcher" in installed_ids:
+        footer_notes.append(
+            "`docs-researcher` runs *before* coding when library/API knowledge is "
+            "needed (training data may be stale)."
+        )
+    if "doc-updater" in installed_ids:
+        footer_notes.append("`doc-updater` runs once per session, not per turn.")
+    if footer_notes:
+        lines.append("")
+        lines.append(" ".join(footer_notes))
+
+    return "\n".join(lines) + "\n"
+
+
+def _write_end_of_turn_block(target: Path, block: str) -> None:
+    """Write (or remove) the end-of-turn block in <target>/CLAUDE.md.
+
+    If *block* is empty, strip any existing block from CLAUDE.md (and delete
+    the file if that leaves it empty). Otherwise create CLAUDE.md with the
+    block, or replace an existing block between the clank markers, or append
+    a fresh block if no markers are present.
+    """
+    claude_md = target / "CLAUDE.md"
+    wrapped = f"{END_OF_TURN_BEGIN}\n{block}{END_OF_TURN_END}\n" if block else ""
+
+    if not claude_md.exists():
+        if wrapped:
+            claude_md.write_text(wrapped)
+        return
+
+    existing = claude_md.read_text()
+    begin = existing.find(END_OF_TURN_BEGIN)
+    end = existing.find(END_OF_TURN_END)
+
+    if begin != -1 and end != -1 and end > begin:
+        end_full = end + len(END_OF_TURN_END)
+        # Swallow a single trailing newline so we don't accumulate blank lines
+        # across re-installs.
+        if end_full < len(existing) and existing[end_full] == "\n":
+            end_full += 1
+        new = existing[:begin] + wrapped + existing[end_full:]
+    elif wrapped:
+        sep = "" if existing.endswith("\n") else "\n"
+        new = existing + sep + "\n" + wrapped
+    else:
+        return  # nothing to remove, nothing to add
+
+    if new.strip():
+        claude_md.write_text(new)
+    else:
+        claude_md.unlink()
+
+
 RECEIPT_NAME = ".clank-installed.json"
 
 
@@ -559,6 +697,13 @@ def uninstall(
         else:
             # No agents left — remove the now-empty rule
             agents_rule_dst.unlink()
+
+    # Rebuild the CLAUDE.md end-of-turn block so it drops uninstalled reviewers.
+    if removed_agents:
+        remaining = set(read_receipt(target).get("artifacts", []))
+        _write_end_of_turn_block(
+            target, _generate_end_of_turn_review(remaining)
+        )
 
 
 def _unmerge_settings(target: Path, fragment: dict) -> None:
@@ -729,6 +874,12 @@ def install(
             if content:
                 agents_rule_dst.parent.mkdir(parents=True, exist_ok=True)
                 agents_rule_dst.write_text(content)
+
+        if new_agents:
+            all_installed = set(read_receipt(target).get("artifacts", []))
+            _write_end_of_turn_block(
+                target, _generate_end_of_turn_review(all_installed)
+            )
 
     print(f"installed: {', '.join(copied_ids) if copied_ids else '(nothing)'}")
     return 0
@@ -1284,6 +1435,10 @@ def _main_impl(argv: list[str] | None) -> int:
             if agents_dst.exists():
                 agents_dst.unlink()
             print("agents.md removed (no agents found)")
+
+        _write_end_of_turn_block(
+            args.target, _generate_end_of_turn_review(all_installed)
+        )
         return 0
 
     include = [x.strip() for x in (args.include or "").split(",") if x.strip()]

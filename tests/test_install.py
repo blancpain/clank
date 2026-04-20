@@ -857,6 +857,168 @@ class TestRefreshAgents(unittest.TestCase):
         self.assertIn("solo", content)
 
 
+class TestEndOfTurnReview(unittest.TestCase):
+    """The 'Before ending a coding turn' block injected into <target>/CLAUDE.md."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.target = Path(self.tmp.name)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    # -- _generate_end_of_turn_review -------------------------------------
+
+    def test_generate_empty_when_no_reviewers_installed(self):
+        self.assertEqual(install._generate_end_of_turn_review(set()), "")
+        self.assertEqual(
+            install._generate_end_of_turn_review({"ruff", "bash-safety"}),
+            "",
+        )
+
+    def test_generate_python_row_pairs_with_code_reviewer(self):
+        block = install._generate_end_of_turn_review(
+            {"python-reviewer", "code-reviewer"}
+        )
+        self.assertIn("Any Python file", block)
+        self.assertIn("`python-reviewer` + `code-reviewer`", block)
+        self.assertIn("Any other code change", block)
+
+    def test_generate_python_row_without_code_reviewer(self):
+        block = install._generate_end_of_turn_review({"python-reviewer"})
+        self.assertIn("| Any Python file | `python-reviewer` |", block)
+        # no catch-all row without code-reviewer
+        self.assertNotIn("Any other code change", block)
+
+    def test_generate_skips_language_rows_when_reviewer_absent(self):
+        block = install._generate_end_of_turn_review({"code-reviewer"})
+        self.assertNotIn("Any Python file", block)
+        self.assertNotIn("Any TypeScript", block)
+        self.assertIn("Any other code change", block)
+
+    def test_generate_sql_rows(self):
+        just_sql = install._generate_end_of_turn_review({"sql-reviewer"})
+        self.assertIn("SQL in any form", just_sql)
+        self.assertNotIn("migration or schema-changing", just_sql)
+
+        with_db = install._generate_end_of_turn_review(
+            {"sql-reviewer", "database-reviewer"}
+        )
+        self.assertIn("migration or schema-changing", with_db)
+        self.assertIn("`database-reviewer` + `sql-reviewer`", with_db)
+
+    def test_generate_database_reviewer_alone_no_migration_row(self):
+        block = install._generate_end_of_turn_review({"database-reviewer"})
+        self.assertNotIn("migration or schema-changing", block)
+
+    def test_generate_pipeline_and_security_rows(self):
+        block = install._generate_end_of_turn_review(
+            {"pipeline-validator", "security-reviewer"}
+        )
+        self.assertIn("Data-pipeline code", block)
+        self.assertIn("`pipeline-validator`", block)
+        self.assertIn("Security-sensitive", block)
+        self.assertIn("`security-reviewer`", block)
+
+    def test_generate_footer_docs_notes(self):
+        block = install._generate_end_of_turn_review(
+            {"code-reviewer", "docs-researcher", "doc-updater"}
+        )
+        self.assertIn("`docs-researcher`", block)
+        self.assertIn("`doc-updater`", block)
+        self.assertIn("coding when library/API knowledge is needed", block)
+
+        no_docs = install._generate_end_of_turn_review({"code-reviewer"})
+        self.assertNotIn("docs-researcher", no_docs)
+        self.assertNotIn("doc-updater", no_docs)
+
+    # -- _write_end_of_turn_block -----------------------------------------
+
+    def test_write_creates_claude_md_when_missing(self):
+        block = install._generate_end_of_turn_review({"code-reviewer"})
+        install._write_end_of_turn_block(self.target, block)
+        path = self.target / "CLAUDE.md"
+        self.assertTrue(path.exists())
+        text = path.read_text()
+        self.assertIn(install.END_OF_TURN_BEGIN, text)
+        self.assertIn(install.END_OF_TURN_END, text)
+        self.assertIn("Before ending a coding turn", text)
+
+    def test_write_appends_to_existing_claude_md(self):
+        claude_md = self.target / "CLAUDE.md"
+        claude_md.write_text("# Project\n\nExisting content.\n")
+        block = install._generate_end_of_turn_review({"code-reviewer"})
+        install._write_end_of_turn_block(self.target, block)
+        text = claude_md.read_text()
+        self.assertTrue(text.startswith("# Project\n\nExisting content."))
+        self.assertIn(install.END_OF_TURN_BEGIN, text)
+
+    def test_write_is_idempotent(self):
+        claude_md = self.target / "CLAUDE.md"
+        claude_md.write_text("# Project\n\nExisting.\n")
+        block = install._generate_end_of_turn_review(
+            {"python-reviewer", "code-reviewer"}
+        )
+        install._write_end_of_turn_block(self.target, block)
+        once = claude_md.read_text()
+        install._write_end_of_turn_block(self.target, block)
+        twice = claude_md.read_text()
+        self.assertEqual(once, twice)
+        # Block markers appear exactly once
+        self.assertEqual(twice.count(install.END_OF_TURN_BEGIN), 1)
+        self.assertEqual(twice.count(install.END_OF_TURN_END), 1)
+
+    def test_write_replaces_existing_block_on_regenerate(self):
+        claude_md = self.target / "CLAUDE.md"
+        claude_md.write_text("# Project\n")
+        first = install._generate_end_of_turn_review(
+            {"python-reviewer", "code-reviewer"}
+        )
+        install._write_end_of_turn_block(self.target, first)
+        # Now regenerate with a different set — Python row must disappear,
+        # SQL row must appear.
+        second = install._generate_end_of_turn_review(
+            {"sql-reviewer", "code-reviewer"}
+        )
+        install._write_end_of_turn_block(self.target, second)
+        text = claude_md.read_text()
+        self.assertNotIn("Any Python file", text)
+        self.assertIn("SQL in any form", text)
+        self.assertEqual(text.count(install.END_OF_TURN_BEGIN), 1)
+
+    def test_write_empty_block_strips_from_claude_md(self):
+        claude_md = self.target / "CLAUDE.md"
+        claude_md.write_text("# Project\n")
+        install._write_end_of_turn_block(
+            self.target,
+            install._generate_end_of_turn_review({"code-reviewer"}),
+        )
+        self.assertIn(install.END_OF_TURN_BEGIN, claude_md.read_text())
+        # Now the user uninstalls every reviewer — block should vanish but
+        # the user's own content must survive.
+        install._write_end_of_turn_block(self.target, "")
+        text = claude_md.read_text()
+        self.assertNotIn(install.END_OF_TURN_BEGIN, text)
+        self.assertIn("# Project", text)
+
+    def test_write_empty_block_deletes_clank_only_claude_md(self):
+        # CLAUDE.md created solely by clank (no user content) — removing the
+        # block should delete the now-empty file rather than leave a stub.
+        install._write_end_of_turn_block(
+            self.target,
+            install._generate_end_of_turn_review({"code-reviewer"}),
+        )
+        self.assertTrue((self.target / "CLAUDE.md").exists())
+        install._write_end_of_turn_block(self.target, "")
+        self.assertFalse((self.target / "CLAUDE.md").exists())
+
+    def test_write_noop_when_no_block_and_no_markers(self):
+        claude_md = self.target / "CLAUDE.md"
+        claude_md.write_text("# Project\n")
+        install._write_end_of_turn_block(self.target, "")
+        self.assertEqual(claude_md.read_text(), "# Project\n")
+
+
 class TestInteractivePicker(unittest.TestCase):
     def setUp(self):
         self.manifest = install.Manifest.load(FIXTURES / "manifest_valid.toml")
