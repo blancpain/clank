@@ -2,7 +2,7 @@
 
 ## Rule
 
-Every new feature, bugfix, or non-trivial change must be developed on a dedicated branch — never directly on `main` (or `master`/`develop`/any shared integration branch).
+Every new feature, bugfix, or non-trivial change must be developed on a dedicated branch and land in `main` (or the project's integration branch) via a pull request — never by direct commit or push to the shared branch.
 
 ## When to create a branch
 
@@ -41,3 +41,16 @@ When in doubt, ask before committing to a shared branch.
 ## Remind, don't auto-switch silently
 
 If the user asks for changes while on a shared branch, surface the branch situation in one short sentence and propose a branch name before starting the work. Do not create the branch silently — the user may have a reason to be on `main`.
+
+## Land changes via a pull request
+
+Once the work on the feature branch is ready, the change ships by opening a pull request against the integration branch — not by pushing commits directly to `main`.
+
+- **Push the branch first**, then open the PR. Use `gh pr create` (or the project's equivalent) with a title and description that explain the *why*, not just the *what*.
+- **One logical change per PR.** If the branch has grown to cover multiple unrelated concerns, split it before requesting review — reviewers should not have to untangle intent.
+- **Never force-push to `main`** and never merge your own PR without the review/CI gates the project requires. If the project has no gates configured, still prefer opening a PR so the diff is reviewable, even if you end up merging it yourself.
+- **Do not open the PR silently.** Confirm with the user before pushing the branch or creating the PR unless they have already authorized it for this task — pushing and PR creation are visible to others and hard to quietly undo.
+
+### Exceptions to the PR requirement
+
+Skip the PR only when the user explicitly says so ("just commit and push", "no PR needed", "land it directly"), or when the project's documented workflow genuinely doesn't use PRs (e.g. a solo scratch repo). When in doubt, ask.
