@@ -1018,6 +1018,74 @@ class TestEndOfTurnReview(unittest.TestCase):
         install._write_end_of_turn_block(self.target, "")
         self.assertEqual(claude_md.read_text(), "# Project\n")
 
+    def test_write_replaces_legacy_unmarked_section(self):
+        # A CLAUDE.md that predates the marker comments — the generated
+        # section is present under its heading but without <!-- clank:...:begin/end -->.
+        # Re-running the installer must replace in place, not append a duplicate.
+        claude_md = self.target / "CLAUDE.md"
+        legacy = (
+            "# Project\n"
+            "\n"
+            "## Planning Docs\n"
+            "\n"
+            "Some roadmap notes.\n"
+            "\n"
+            "### Before ending a coding turn\n"
+            "\n"
+            "Old hand-written content with project-specific `scripts/ingest/` paths.\n"
+            "\n"
+            "| If you touched | Launch |\n"
+            "|---|---|\n"
+            "| Files in `scripts/ingest/migrations/` | `database-reviewer` + `sql-reviewer` |\n"
+        )
+        claude_md.write_text(legacy)
+        block = install._generate_end_of_turn_review(
+            {"python-reviewer", "code-reviewer"}
+        )
+        install._write_end_of_turn_block(self.target, block)
+        text = claude_md.read_text()
+        # Exactly one end-of-turn section — the legacy copy is gone.
+        self.assertEqual(text.count("### Before ending a coding turn"), 1)
+        self.assertEqual(text.count(install.END_OF_TURN_BEGIN), 1)
+        self.assertEqual(text.count(install.END_OF_TURN_END), 1)
+        # Legacy-only content disappears; generated content is present.
+        self.assertNotIn("scripts/ingest/migrations/", text)
+        self.assertIn("`python-reviewer` + `code-reviewer`", text)
+        # User's other content is preserved, in order.
+        self.assertIn("## Planning Docs", text)
+        self.assertIn("Some roadmap notes.", text)
+        self.assertLess(text.index("## Planning Docs"), text.index(install.END_OF_TURN_BEGIN))
+
+    def test_write_replaces_legacy_section_at_end_of_file(self):
+        # Legacy section with no trailing newline and no following heading —
+        # the writer must still replace it cleanly.
+        claude_md = self.target / "CLAUDE.md"
+        claude_md.write_text(
+            "# Project\n\n### Before ending a coding turn\n\nOld content.\n"
+        )
+        block = install._generate_end_of_turn_review({"code-reviewer"})
+        install._write_end_of_turn_block(self.target, block)
+        text = claude_md.read_text()
+        self.assertEqual(text.count("### Before ending a coding turn"), 1)
+        self.assertEqual(text.count(install.END_OF_TURN_BEGIN), 1)
+        self.assertNotIn("Old content.", text)
+        self.assertIn("# Project", text)
+
+    def test_write_empty_strips_legacy_unmarked_section(self):
+        # Uninstall path: no reviewers remain, so the block is empty. A legacy
+        # unmarked section must still be stripped.
+        claude_md = self.target / "CLAUDE.md"
+        claude_md.write_text(
+            "# Project\n\n### Before ending a coding turn\n\nOld content.\n\n## After\n\nkeep me\n"
+        )
+        install._write_end_of_turn_block(self.target, "")
+        text = claude_md.read_text()
+        self.assertNotIn("Before ending a coding turn", text)
+        self.assertNotIn("Old content.", text)
+        self.assertIn("# Project", text)
+        self.assertIn("## After", text)
+        self.assertIn("keep me", text)
+
 
 class TestInteractivePicker(unittest.TestCase):
     def setUp(self):

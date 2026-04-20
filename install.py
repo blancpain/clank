@@ -469,6 +469,10 @@ def _generate_agents_rule(
 
 END_OF_TURN_BEGIN = "<!-- clank:end-of-turn-review:begin -->"
 END_OF_TURN_END = "<!-- clank:end-of-turn-review:end -->"
+# Heading used by the generator and by earlier (pre-markers) clank installs.
+# Kept as a constant so the writer can locate and replace a legacy section
+# that was emitted before the marker comments existed.
+END_OF_TURN_HEADING = "### Before ending a coding turn"
 
 # Language-specific reviewer mapping for the end-of-turn table. Each row is
 # (trigger label, reviewer agent id). The reviewer is paired with code-reviewer
@@ -566,13 +570,45 @@ def _generate_end_of_turn_review(installed_ids: set[str]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _find_legacy_end_of_turn_span(existing: str) -> tuple[int, int] | None:
+    """Locate a pre-markers end-of-turn section by heading.
+
+    Earlier clank versions emitted the section without marker comments, so
+    re-running the installer would append a fresh marked copy alongside the
+    old one. Detect that case by heading and return the (start, end) slice
+    of the legacy section (heading through the line before the next `#`,
+    `##`, or `###` heading, or EOF). Returns None if no legacy section is
+    present.
+    """
+    lines = existing.splitlines(keepends=True)
+    start_idx: int | None = None
+    for i, line in enumerate(lines):
+        if line.rstrip("\n") == END_OF_TURN_HEADING:
+            start_idx = i
+            break
+    if start_idx is None:
+        return None
+
+    end_idx = len(lines)
+    for j in range(start_idx + 1, len(lines)):
+        stripped = lines[j].lstrip()
+        if stripped.startswith(("# ", "## ", "### ")):
+            end_idx = j
+            break
+
+    start_offset = sum(len(lines[k]) for k in range(start_idx))
+    end_offset = sum(len(lines[k]) for k in range(end_idx))
+    return start_offset, end_offset
+
+
 def _write_end_of_turn_block(target: Path, block: str) -> None:
     """Write (or remove) the end-of-turn block in <target>/CLAUDE.md.
 
     If *block* is empty, strip any existing block from CLAUDE.md (and delete
     the file if that leaves it empty). Otherwise create CLAUDE.md with the
-    block, or replace an existing block between the clank markers, or append
-    a fresh block if no markers are present.
+    block, replace an existing block between the clank markers, replace a
+    pre-markers legacy section detected by heading, or append a fresh block
+    if neither is present.
     """
     claude_md = target / "CLAUDE.md"
     wrapped = f"{END_OF_TURN_BEGIN}\n{block}{END_OF_TURN_END}\n" if block else ""
@@ -593,11 +629,28 @@ def _write_end_of_turn_block(target: Path, block: str) -> None:
         if end_full < len(existing) and existing[end_full] == "\n":
             end_full += 1
         new = existing[:begin] + wrapped + existing[end_full:]
-    elif wrapped:
-        sep = "" if existing.endswith("\n") else "\n"
-        new = existing + sep + "\n" + wrapped
     else:
-        return  # nothing to remove, nothing to add
+        legacy = _find_legacy_end_of_turn_span(existing)
+        if legacy is not None:
+            start_offset, end_offset = legacy
+            # Trim trailing blank lines belonging to the legacy section so the
+            # replacement doesn't leave a stack of blank lines behind.
+            head = existing[:start_offset].rstrip("\n")
+            tail = existing[end_offset:].lstrip("\n")
+            if wrapped:
+                sep_before = "\n\n" if head else ""
+                sep_after = "\n" if tail else ""
+                new = head + sep_before + wrapped + sep_after + tail
+            else:
+                sep = "\n" if head and tail else ""
+                new = head + sep + tail
+                if new and not new.endswith("\n"):
+                    new += "\n"
+        elif wrapped:
+            sep = "" if existing.endswith("\n") else "\n"
+            new = existing + sep + "\n" + wrapped
+        else:
+            return  # nothing to remove, nothing to add
 
     if new.strip():
         claude_md.write_text(new)
