@@ -246,6 +246,13 @@ description = "TypeScript/JavaScript specialist reviewer — types, hooks, promi
 tags = ["typescript", "javascript", "review"]
 
 [[artifacts]]
+id = "frontend-reviewer"
+type = "agent"
+path = "addons/typescript/agents/frontend-reviewer.md"
+description = "Frontend reviewer for React/Svelte/Vue — a11y, semantic HTML, forms, CSS/CLS, assets, component composition"
+tags = ["typescript", "frontend", "review"]
+
+[[artifacts]]
 id = "biome"
 type = "hook"
 path = "addons/typescript/hooks/biome-check.sh"
@@ -260,6 +267,23 @@ path = "addons/typescript/hooks/svelte-check.sh"
 settings_fragment = "addons/typescript/settings.fragments/svelte-check.json"
 description = "PostToolUse svelte-check on .svelte files. Inert on non-Svelte projects."
 tags = ["typescript", "svelte", "lint"]
+
+[[artifacts]]
+id = "eslint"
+type = "hook"
+path = "addons/typescript/hooks/eslint-check.sh"
+settings_fragment = "addons/typescript/settings.fragments/eslint.json"
+description = "PostToolUse eslint check on edited TS/JS files"
+tags = ["typescript", "lint"]
+
+[[artifacts]]
+id = "tsc-check"
+type = "hook"
+path = "addons/typescript/hooks/tsc-check.sh"
+settings_fragment = "addons/typescript/settings.fragments/tsc-check.json"
+description = "PostToolUse tsc --noEmit on TS/TSX edits. Project-wide check with 30s debounce. Opt-in — expensive on large codebases."
+tags = ["typescript", "lint"]
+default = false
 
 [[artifacts]]
 id = "typescript-coding-style"
@@ -385,6 +409,14 @@ description = "Go idioms — small interfaces, functional options, sync.Once"
 tags = ["go", "patterns"]
 
 [[artifacts]]
+id = "mcp-supabase-safety"
+type = "hook"
+path = "addons/supabase/hooks/pretooluse-mcp-supabase-safety.sh"
+settings_fragment = "addons/supabase/settings.fragments/mcp-supabase-safety.json"
+description = "PreToolUse guardrail on mcp__supabase__execute_sql and mcp__supabase__apply_migration — blocks DROP/TRUNCATE/DELETE/UPDATE"
+tags = ["supabase", "safety"]
+
+[[artifacts]]
 id = "rust-reviewer"
 type = "agent"
 path = "addons/rust/agents/rust-reviewer.md"
@@ -424,8 +456,9 @@ tags = ["rust", "security"]
 minimal = ["bash-safety", "file-safety", "code-reviewer", "executing-actions-with-care"]
 base-only = ["@tag:base"]
 python = ["@preset:base-only", "python-reviewer", "pipeline-validator", "ruff", "python-coding-style", "python-testing", "python-security", "python-patterns"]
-typescript = ["@preset:base-only", "typescript-reviewer", "biome", "svelte-check", "typescript-coding-style", "typescript-testing", "typescript-security", "typescript-patterns"]
+typescript = ["@preset:base-only", "typescript-reviewer", "frontend-reviewer", "biome", "svelte-check", "typescript-coding-style", "typescript-testing", "typescript-security", "typescript-patterns"]
 sql = ["@preset:base-only", "sql-reviewer", "mcp-postgres-safety", "schema-sync-reminder", "sql-safety", "pg-mcp", "querying-db", "migration"]
+supabase = ["@preset:base-only", "mcp-supabase-safety"]
 go = ["@preset:base-only", "go-reviewer", "golangci-lint", "golang-coding-style", "golang-testing", "golang-security", "golang-patterns"]
 rust = ["@preset:base-only", "rust-reviewer", "cargo-clippy", "rust-coding-style", "rust-testing", "rust-security"]
 python-sql = ["@preset:python", "@preset:sql"]
