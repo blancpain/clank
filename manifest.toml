@@ -429,6 +429,14 @@ description = "PreToolUse guardrail on mcp__supabase__execute_sql and mcp__supab
 tags = ["supabase", "safety"]
 
 [[artifacts]]
+id = "supabase-mcp"
+type = "mcp"
+path = "addons/supabase/mcp/supabase-mcp-wrapper.sh"
+mcp_fragment = "addons/supabase/mcp/mcp-supabase.json"
+description = "Supabase MCP server — reads SUPABASE_ACCESS_TOKEN + SUPABASE_PROJECT_REF from .env, launches @supabase/mcp-server-supabase in --read-only mode"
+tags = ["supabase"]
+
+[[artifacts]]
 id = "rust-reviewer"
 type = "agent"
 path = "addons/rust/agents/rust-reviewer.md"
@@ -470,7 +478,7 @@ base-only = ["@tag:base"]
 python = ["@preset:base-only", "python-reviewer", "pipeline-validator", "ruff", "python-coding-style", "python-testing", "python-security", "python-patterns"]
 typescript = ["@preset:base-only", "typescript-reviewer", "frontend-reviewer", "biome", "svelte-check", "typescript-coding-style", "typescript-testing", "typescript-security", "typescript-patterns"]
 sql = ["@preset:base-only", "sql-reviewer", "mcp-postgres-safety", "schema-sync-reminder", "sql-safety", "pg-mcp", "querying-db", "migration"]
-supabase = ["@preset:base-only", "mcp-supabase-safety"]
+supabase = ["@preset:base-only", "mcp-supabase-safety", "supabase-mcp"]
 go = ["@preset:base-only", "go-reviewer", "golangci-lint", "golang-coding-style", "golang-testing", "golang-security", "golang-patterns"]
 rust = ["@preset:base-only", "rust-reviewer", "cargo-clippy", "rust-coding-style", "rust-testing", "rust-security"]
 python-sql = ["@preset:python", "@preset:sql"]
