@@ -150,4 +150,28 @@ Use `# TODO: fill in ...` comments to mark every section the user must customize
 
 **`base/skills/deploy/SKILL.md`** — scaffold skill with `disable-model-invocation: true`. Ships a complete workflow (pre-flight → deploy → verify → rollback) with `# TODO` placeholders for the deploy command and health check. The user edits this once after install.
 
+---
+
+## External skills (fetched via `npx skills`)
+
+For skills published to [skills.sh](https://skills.sh) that you'd rather pull fresh at install time than vendor into clank, use the `external-skill` artifact type. The installer shells out to `npx skills add <source> --skill <skill_name> --copy` inside the target directory, which lands the skill at `<target>/.claude/skills/<skill_name>/`.
+
+```toml
+[[artifacts]]
+id = "find-skills"
+type = "external-skill"
+source = "vercel-labs/skills"
+skill_name = "find-skills"
+description = "Discover skills from skills.sh at runtime. Fetched via `npx skills add`; requires Node."
+tags = ["base", "meta"]
+default = false
+```
+
+- `source` is the repo reference passed to `npx skills add` (e.g. `vercel-labs/skills`, or a full URL).
+- `skill_name` is both the `--skill` argument and the directory name the skill gets installed into. Use it for `--uninstall` symmetry.
+- Do **not** set `path` — external skills have no source inside clank.
+- Keep `default = false`. External skills require Node at install time; users opt in via `--include`.
+- Uninstall is supported: clank removes `<target>/.claude/skills/<skill_name>/` and updates the receipt.
+- If `npx` is missing, the installer warns and skips the artifact rather than failing the whole run — same pattern as lint hooks.
+
 **`addons/sql/skills/querying-db/SKILL.md`** — skill with a supporting file. `SKILL.md` describes the query procedure; `schema.txt.template` is a scaffold the user fills in with their actual schema. The installer copies both files into `.claude/skills/querying-db/`.

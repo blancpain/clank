@@ -22,7 +22,7 @@ from typing import Callable
 
 __version__ = "0.1.0"
 
-VALID_TYPES = {"agent", "hook", "rule", "skill", "plugin-doc", "mcp"}
+VALID_TYPES = {"agent", "hook", "rule", "skill", "external-skill", "plugin-doc", "mcp"}
 
 
 class Manifest:
@@ -68,6 +68,20 @@ def lint_manifest(manifest: Manifest, clank_root: Path) -> list[str]:
     for aid, artifact in manifest.artifacts.items():
         if artifact.get("type") not in VALID_TYPES:
             errors.append(f"{aid}: invalid type {artifact.get('type')!r}")
+
+        if artifact.get("type") == "external-skill":
+            # External skills are fetched at install time via `npx skills add`
+            # and live at target/.claude/skills/<skill_name>/ afterwards. They
+            # have no source path inside clank.
+            if not artifact.get("source"):
+                errors.append(f"{aid}: external-skill requires 'source' field")
+            if not artifact.get("skill_name"):
+                errors.append(f"{aid}: external-skill requires 'skill_name' field")
+            if artifact.get("path"):
+                errors.append(
+                    f"{aid}: external-skill must not define 'path' (fetched via npx)"
+                )
+            continue
 
         src = clank_root / artifact["path"]
         if not src.exists():
@@ -220,6 +234,66 @@ def _copy_directory(
         if _copy_file(src_file, dst_file, on_conflict):
             any_copied = True
     return any_copied
+
+
+def _external_skill_dir(artifact: dict, target: Path) -> Path:
+    """Return the directory where `npx skills add` drops this external skill."""
+    return target / ".claude" / "skills" / artifact["skill_name"]
+
+
+def _install_external_skill(artifact: dict, target: Path) -> bool:
+    """Fetch an external skill by shelling out to `npx skills add`.
+
+    Returns True on success, False if npx is missing or the command failed.
+    Failures are warnings rather than hard errors — external skills are
+    opt-in (default=false) and shouldn't block the rest of the install.
+
+    The `--copy` flag is passed deliberately: `npx skills` symlinks into a
+    cache by default, which breaks if the cache is cleared or the project is
+    copied to another machine.
+    """
+    import subprocess
+
+    if shutil.which("npx") is None:
+        print(
+            f"clank: skipping external-skill {artifact['id']} "
+            "(npx not found — install Node.js to fetch external skills)",
+            file=sys.stderr,
+        )
+        return False
+
+    cmd = [
+        "npx", "-y", "skills", "add", artifact["source"],
+        "--skill", artifact["skill_name"],
+        "--copy",
+        "-a", "claude-code",
+        "-y",
+    ]
+    try:
+        result = subprocess.run(
+            cmd,
+            cwd=target,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=180,
+        )
+    except (subprocess.TimeoutExpired, OSError) as e:
+        print(
+            f"clank: failed to fetch external-skill {artifact['id']}: {e}",
+            file=sys.stderr,
+        )
+        return False
+
+    if result.returncode != 0:
+        print(
+            f"clank: npx skills failed for {artifact['id']} "
+            f"(exit {result.returncode}):\n{result.stderr.strip()}",
+            file=sys.stderr,
+        )
+        return False
+
+    return True
 
 
 def resolve_selection(
@@ -700,6 +774,14 @@ def uninstall(
         if aid not in manifest.artifacts:
             raise InstallError(f"unknown artifact: {aid}")
         artifact = manifest.artifacts[aid]
+
+        if artifact.get("type") == "external-skill":
+            ext_dst = _external_skill_dir(artifact, target)
+            if ext_dst.is_dir():
+                shutil.rmtree(ext_dst)
+            installed.discard(aid)
+            continue
+
         dst = _artifact_destination(artifact, target)
 
         if artifact.get("type") == "skill":
@@ -869,6 +951,18 @@ def install(
     copied_ids: list[str] = []
     for aid in sorted(selected):
         artifact = manifest.artifacts[aid]
+        if artifact.get("type") == "external-skill":
+            dst = _external_skill_dir(artifact, target)
+            if dry_run:
+                print(
+                    f"[dry-run] npx skills add {artifact['source']} "
+                    f"--skill {artifact['skill_name']} -> {dst}"
+                )
+                copied_ids.append(aid)
+                continue
+            if _install_external_skill(artifact, target):
+                copied_ids.append(aid)
+            continue
         src = clank_root / artifact["path"]
         dst = _artifact_destination(artifact, target)
         if dry_run:
@@ -1048,6 +1142,7 @@ CATEGORIES = [
     ("hook", "Hooks"),
     ("rule", "Rules"),
     ("skill", "Skills"),
+    ("external-skill", "External skills (npx)"),
     ("mcp", "MCP servers"),
     ("plugin-doc", "Plugin docs"),
 ]
@@ -1367,12 +1462,41 @@ def interactive_pick(
     return selected
 
 
+def _resolve_target(args: argparse.Namespace) -> Path:
+    """Return an explicit --target, or default to CWD after a confirm prompt.
+
+    Prompting protects users from accidentally installing into `~` or an
+    unrelated directory. `--force` and `--dry-run` skip the prompt — force
+    because the user has explicitly opted into non-interactive install, and
+    dry-run because nothing is written.
+    """
+    if args.target is not None:
+        return args.target
+    cwd = Path.cwd()
+    if args.force or args.dry_run:
+        return cwd
+    try:
+        answer = input(f"clank: install into {cwd}? [y/N] ").strip().lower()
+    except EOFError:
+        answer = ""
+    if answer not in ("y", "yes"):
+        raise InstallError(
+            "aborted — pass --target explicitly, or --force to accept CWD"
+        )
+    return cwd
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="clank",
         description="Install clank .claude/ artifacts into a project",
     )
-    parser.add_argument("--target", type=Path, help="Target project directory")
+    parser.add_argument(
+        "--target",
+        type=Path,
+        default=None,
+        help="Target project directory (default: current directory, with confirmation)",
+    )
     parser.add_argument("--preset", help="Named bundle from manifest.toml")
     parser.add_argument("--include", help="Comma-separated artifact IDs to add")
     parser.add_argument("--exclude", help="Comma-separated artifact IDs to drop")
@@ -1447,21 +1571,20 @@ def _main_impl(argv: list[str] | None) -> int:
             print(f"{aid:30} [{a['type']:10}] ({tags}) — {a.get('description', '')}")
         return 0
 
-    if not args.target:
-        parser.error("--target is required unless --list is given")
-
     if args.uninstall:
+        target = _resolve_target(args)
         manifest = Manifest.load(manifest_path)
         ids = [x.strip() for x in args.uninstall.split(",") if x.strip()]
-        uninstall(manifest, clank_root, args.target, ids)
+        uninstall(manifest, clank_root, target, ids)
         print(f"uninstalled: {', '.join(ids)}")
         return 0
 
     if args.refresh_agents:
+        target = _resolve_target(args)
         manifest = Manifest.load(manifest_path)
-        agents_dst = args.target / ".claude" / "rules" / "agents.md"
-        all_installed = set(read_receipt(args.target).get("artifacts", []))
-        content = _generate_agents_rule(manifest, all_installed, args.target)
+        agents_dst = target / ".claude" / "rules" / "agents.md"
+        all_installed = set(read_receipt(target).get("artifacts", []))
+        content = _generate_agents_rule(manifest, all_installed, target)
         if content:
             agents_dst.parent.mkdir(parents=True, exist_ok=True)
             agents_dst.write_text(content)
@@ -1471,7 +1594,7 @@ def _main_impl(argv: list[str] | None) -> int:
                 if manifest.artifacts.get(aid, {}).get("type") == "agent"
             )
             # Count custom agents from disk
-            agents_dir = args.target / ".claude" / "agents"
+            agents_dir = target / ".claude" / "agents"
             if agents_dir.is_dir():
                 manifest_files = {
                     Path(manifest.artifacts[aid]["path"]).name
@@ -1490,7 +1613,7 @@ def _main_impl(argv: list[str] | None) -> int:
             print("agents.md removed (no agents found)")
 
         _write_end_of_turn_block(
-            args.target, _generate_end_of_turn_review(all_installed)
+            target, _generate_end_of_turn_review(all_installed)
         )
         return 0
 
@@ -1500,11 +1623,15 @@ def _main_impl(argv: list[str] | None) -> int:
     if not args.preset and not include and not args.interactive:
         parser.error("one of --preset, --include, --interactive is required")
 
+    # Resolve target only after we know a selection is viable — avoids
+    # prompting the user to confirm CWD only to fail on missing --preset.
+    target = _resolve_target(args)
+
     if args.interactive:
         manifest_for_picker = Manifest.load(manifest_path)
         # Pre-check artifacts that are already installed in the target so the
         # picker reflects current state instead of starting empty.
-        already = set(read_receipt(args.target).get("artifacts", []))
+        already = set(read_receipt(target).get("artifacts", []))
         preselected = already & set(manifest_for_picker.artifacts)
         picked = curses_pick(manifest_for_picker, preselected)
         if picked is None:
@@ -1537,7 +1664,7 @@ def _main_impl(argv: list[str] | None) -> int:
     return install(
         manifest_path=manifest_path,
         clank_root=clank_root,
-        target=args.target,
+        target=target,
         preset=args.preset,
         include=include,
         exclude=exclude,

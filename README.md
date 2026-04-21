@@ -4,24 +4,100 @@ A template repository of Claude Code customizations — agents, hooks, rules, sk
 
 ## What clank is
 
-clank packages the Claude Code configuration patterns that actually work in production: code-review agents with confidence filtering, PreToolUse safety hooks that block destructive SQL and accidental `rm`, per-language specialist reviewers, and rules that encode hard-won process lessons. Instead of copy-pasting from a prior project every time, you run the installer, pick a preset, and get a fully wired `.claude/` directory in seconds. Everything is configurable — select individual artifacts, exclude what you don't need, or use the interactive picker to browse all 50 artifacts before installing.
+clank packages the Claude Code configuration patterns that actually work in production: code-review agents with confidence filtering, PreToolUse safety hooks that block destructive SQL and accidental `rm`, per-language specialist reviewers, and rules that encode hard-won process lessons. Instead of copy-pasting from a prior project every time, you run the installer, pick a preset, and get a fully wired `.claude/` directory in seconds. Everything is configurable — select individual artifacts, exclude what you don't need, or use the interactive picker to browse the catalog before installing.
 
 ## Quickstart
 
+One line, from anywhere:
+
 ```bash
+cd ~/repos/my-project
 curl -fsSL https://raw.githubusercontent.com/blancpain/clank/main/install.sh \
-  | sh -s -- --target ~/repos/new-project --preset python-sql
+  | sh -s -- --interactive
 ```
 
-That fetches the latest `main`, copies every artifact for Python + SQL into `~/repos/new-project/.claude/`, merges hook entries into `settings.json`, and writes a receipt at `~/repos/new-project/.claude/.clank-installed.json`. Every `install.py` flag works after the `--`; pin to a specific ref with `CLANK_REF=<branch|tag|sha>` in the environment.
+clank installs into the current working directory by default and asks `install into <cwd>? [y/N]` before touching anything. `--interactive` opens a curses picker so you can browse every available artifact and check the ones you want. Files land in `./.claude/` and a receipt at `./.claude/.clank-installed.json` records what was installed.
 
-Prefer a local checkout? Clone and run `install.py` directly — same result:
+Pin to a specific ref with `CLANK_REF=<branch|tag|sha>`. See [Usage](#usage) for preset bundles and other selection flags.
+
+Prefer a local checkout? Clone once, then run the installer from inside any project directory:
 
 ```bash
-git clone git@github.com:blancpain/clank.git
-cd clank
-./install.py --target ~/repos/new-project --preset python-sql
+git clone git@github.com:blancpain/clank.git ~/tools/clank
+cd ~/repos/my-project
+~/tools/clank/install.py --interactive
 ```
+
+Same result — skips the `curl | tar` bootstrap.
+
+## Usage
+
+Every example below runs from inside the project directory. `curl | sh -s -- <flags>` works identically.
+
+### Simplest — a preset, CWD default
+
+```bash
+./install.py --preset minimal
+```
+Prompts `y/N` to confirm CWD, then installs `minimal` (core safety hooks + code-reviewer + actions-with-care rule) into `./.claude/`.
+
+### Non-interactive (CI, scripts)
+
+```bash
+./install.py --preset python-sql --force
+```
+`--force` skips the CWD confirmation **and** overwrites existing files on conflict. Use this when there's no TTY or you're sure about overwrites.
+
+### Install somewhere other than CWD
+
+```bash
+./install.py --target ~/repos/other-project --preset base-only
+```
+Explicit `--target` skips the CWD confirm — the flag itself is the confirmation.
+
+### Preview without writing anything
+
+```bash
+./install.py --preset python --dry-run
+```
+Prints the planned copies and `settings.json` merges, touches no files.
+
+### Browse interactively
+
+```bash
+./install.py --interactive
+```
+Opens a curses picker, one page per category (agents, hooks, rules, skills, external skills, MCP servers, plugin docs). Space toggles, `a` toggles all in a category, enter advances.
+
+### Mix a preset with extras or drops
+
+```bash
+./install.py --preset python --include stop-review-reminder --exclude plugins-doc
+```
+`--include` and `--exclude` take comma-separated artifact IDs. `--include` forces an ID in even if it's `default = false` (like `stop-review-reminder`).
+
+### See every available artifact
+
+```bash
+./install.py --list
+```
+Prints every artifact with its ID, type, tags, and description.
+
+### Uninstall
+
+```bash
+./install.py --uninstall ruff,python-reviewer
+```
+Removes the listed artifact files and reverses their `settings.json` fragment entries. Receipt is updated. To wipe everything, delete `.claude/` manually.
+
+### External skills (fetched at install time)
+
+clank supports skills published to [skills.sh](https://skills.sh) that you'd rather pull fresh from upstream than vendor into the repo:
+
+```bash
+./install.py --include find-skills --force
+```
+Shells out to `npx skills add vercel-labs/skills --skill find-skills --copy` inside the project, landing the skill at `./.claude/skills/find-skills/`. Requires Node; the installer warns and skips if `npx` is missing. External skills are `default = false` — you always opt in by ID.
 
 See [docs/install.md](docs/install.md) for the full flag reference.
 
@@ -58,26 +134,15 @@ Pass `--preset <name>` to install a named bundle. Presets are composable — eac
 | `python-sql` | python + sql |
 | `typescript-sql` | typescript + sql |
 | `fullstack-python` | python + typescript + sql |
-| `all` | Every artifact in the manifest (50 total) |
+| `all` | Every artifact in the manifest |
 
-## Individual artifacts
-
-```bash
-./install.py --list
-```
-
-Lists all 50 artifacts with their ID, type, tags, and description. You can install any combination by ID:
-
-```bash
-./install.py --target ~/repos/api --preset python --include stop-review-reminder --exclude plugins-doc
-```
-
-Artifact categories:
+Artifact categories (run `./install.py --list` to see every ID):
 
 - **agents** — specialist reviewers and researchers (code-reviewer, security-reviewer, database-reviewer, docs-researcher, doc-updater, python/typescript/go/rust/sql reviewers)
 - **hooks** — shell scripts wired into Claude Code events via `settings.json` (PreToolUse safety blocks, PostToolUse linters, Stop review reminder)
 - **rules** — Markdown rule fragments loaded via `.claude/rules/` (code review process, safety discipline, style, testing, security, patterns)
 - **skills** — user-invokable procedures (`/review`, `/smoke-test`, `/deploy`, `/querying-db`, `/migration`)
+- **external skills** — fetched from [skills.sh](https://skills.sh) at install time via `npx`
 - **plugin-docs** — reference list of recommended Claude Code plugins
 
 ## Per-language depth
@@ -105,14 +170,6 @@ Conflict: .claude/agents/code-reviewer.md already exists.
 - **abort** — stop the install (files already copied are not rolled back; receipt is written so `--uninstall` can clean up)
 
 Use `--force` to overwrite all conflicts without prompting. Use `--dry-run` to preview what would change without writing anything. See [docs/install.md](docs/install.md) for the full install sequence and settings.json merge behavior.
-
-## Uninstall
-
-```bash
-./install.py --target ~/repos/api --uninstall ruff,python-reviewer
-```
-
-Removes the listed artifact files and reverses their `settings.json` fragment entries. The receipt is updated. To uninstall everything, delete `<target>/.claude/` manually.
 
 ## Extending clank
 

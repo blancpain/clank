@@ -2,11 +2,14 @@
 # clank bootstrap — fetch the repo tarball and run install.py. Zero-clone UX.
 #
 # Usage:
+#   cd ~/repos/new-project
 #   curl -fsSL https://raw.githubusercontent.com/blancpain/clank/main/install.sh \
-#     | sh -s -- --target ~/repos/new-project --preset python-sql
+#     | sh -s -- --preset python-sql
 #
-# Any flags after `--` are passed straight through to install.py, so every
-# install.py option works (see docs/install.md).
+# clank installs into the current directory by default (with a y/N confirm).
+# Pass --target explicitly to install somewhere else, or --force to skip the
+# CWD confirm in non-interactive contexts. Any flags after `--` are passed
+# straight through to install.py (see docs/install.md).
 #
 # Environment:
 #   CLANK_REF   git ref (branch, tag, or SHA) to fetch. Default: main.

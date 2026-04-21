@@ -38,7 +38,9 @@ class TestCLI(unittest.TestCase):
     def test_no_args_shows_help_and_fails(self):
         rc, _, err = run_install()
         self.assertNotEqual(rc, 0)
-        self.assertIn("--target", err)
+        # --target defaults to CWD now, so the argparse error is about missing
+        # a selection flag instead.
+        self.assertIn("--preset", err)
 
     def test_help_flag(self):
         rc, out, _ = run_install("--help")
@@ -79,6 +81,111 @@ class TestManifestLint(unittest.TestCase):
         m = install.Manifest.load(FIXTURES / "manifest_bad_missing_path.toml")
         errors = install.lint_manifest(m, FIXTURES)
         self.assertTrue(any("does not exist" in e for e in errors))
+
+
+class TestExternalSkill(unittest.TestCase):
+    """Install/uninstall flow for the external-skill artifact type."""
+
+    def setUp(self):
+        self.manifest = install.Manifest.load(FIXTURES / "manifest_valid.toml")
+        self.tmp = tempfile.TemporaryDirectory()
+        self.target = Path(self.tmp.name)
+        (self.target / ".claude").mkdir()
+        self.artifact = self.manifest.artifacts["stub-external-skill"]
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_lint_rejects_external_skill_with_path(self):
+        bad = install.Manifest(
+            artifacts=[
+                {
+                    "id": "bad-ext",
+                    "type": "external-skill",
+                    "source": "foo/bar",
+                    "skill_name": "bad",
+                    "path": "base/something",
+                }
+            ],
+            presets={},
+            version=1,
+        )
+        errors = install.lint_manifest(bad, FIXTURES)
+        self.assertTrue(any("must not define 'path'" in e for e in errors))
+
+    def test_lint_requires_source_and_skill_name(self):
+        bad = install.Manifest(
+            artifacts=[{"id": "bad-ext", "type": "external-skill"}],
+            presets={},
+            version=1,
+        )
+        errors = install.lint_manifest(bad, FIXTURES)
+        self.assertTrue(any("'source' field" in e for e in errors))
+        self.assertTrue(any("'skill_name' field" in e for e in errors))
+
+    def test_install_shells_out_to_npx_with_expected_args(self):
+        fake = mock.MagicMock(returncode=0, stdout="", stderr="")
+        with (
+            mock.patch("shutil.which", return_value="/usr/bin/npx"),
+            mock.patch("subprocess.run", return_value=fake) as run,
+        ):
+            ok = install._install_external_skill(self.artifact, self.target)
+        self.assertTrue(ok)
+        cmd = run.call_args.args[0]
+        self.assertEqual(cmd[:4], ["npx", "-y", "skills", "add"])
+        self.assertIn("example/repo", cmd)
+        self.assertIn("--skill", cmd)
+        self.assertIn("stub-external", cmd)
+        self.assertIn("--copy", cmd)
+        # runs in the target dir so `npx skills` resolves CWD to .claude/skills/
+        self.assertEqual(run.call_args.kwargs["cwd"], self.target)
+
+    def test_install_skips_gracefully_when_npx_missing(self):
+        with mock.patch("shutil.which", return_value=None):
+            ok = install._install_external_skill(self.artifact, self.target)
+        self.assertFalse(ok)
+
+    def test_install_reports_false_on_nonzero_exit(self):
+        fake = mock.MagicMock(returncode=1, stdout="", stderr="boom")
+        with (
+            mock.patch("shutil.which", return_value="/usr/bin/npx"),
+            mock.patch("subprocess.run", return_value=fake),
+        ):
+            ok = install._install_external_skill(self.artifact, self.target)
+        self.assertFalse(ok)
+
+    def test_dry_run_does_not_invoke_npx(self):
+        with mock.patch("subprocess.run") as run:
+            rc = install.install(
+                manifest_path=FIXTURES / "manifest_valid.toml",
+                clank_root=FIXTURES,
+                target=self.target,
+                preset=None,
+                include=["stub-external-skill"],
+                exclude=[],
+                conflict_policy="skip",
+                dry_run=True,
+                stop_hook_opt_in=False,
+                clank_version="0.1.0",
+                clank_commit="test",
+            )
+        self.assertEqual(rc, 0)
+        run.assert_not_called()
+
+    def test_uninstall_removes_skill_directory(self):
+        skill_dir = self.target / ".claude" / "skills" / "stub-external"
+        skill_dir.mkdir(parents=True)
+        (skill_dir / "SKILL.md").write_text("# stub\n")
+        install.write_receipt(
+            self.target, ["stub-external-skill"], "0.1.0", "test"
+        )
+
+        install.uninstall(
+            self.manifest, FIXTURES, self.target, ["stub-external-skill"]
+        )
+        self.assertFalse(skill_dir.exists())
+        receipt = install.read_receipt(self.target)
+        self.assertEqual(receipt.get("artifacts", []), [])
 
 
 class TestSelectionResolution(unittest.TestCase):
@@ -157,6 +264,40 @@ class TestSafetyChecks(unittest.TestCase):
             target = Path(tmp) / "preview-only"
             install.check_target(target, dry_run=True)
             self.assertFalse(target.exists())
+
+
+class TestResolveTarget(unittest.TestCase):
+    """--target defaults to CWD with a y/N confirm gate."""
+
+    def _args(self, **kw):
+        import argparse
+        defaults = {"target": None, "force": False, "dry_run": False}
+        defaults.update(kw)
+        return argparse.Namespace(**defaults)
+
+    def test_explicit_target_passes_through(self):
+        explicit = Path("/tmp/whatever")
+        self.assertEqual(install._resolve_target(self._args(target=explicit)), explicit)
+
+    def test_force_skips_prompt_and_returns_cwd(self):
+        self.assertEqual(install._resolve_target(self._args(force=True)), Path.cwd())
+
+    def test_dry_run_skips_prompt_and_returns_cwd(self):
+        self.assertEqual(install._resolve_target(self._args(dry_run=True)), Path.cwd())
+
+    def test_confirm_yes_returns_cwd(self):
+        with mock.patch("builtins.input", return_value="y"):
+            self.assertEqual(install._resolve_target(self._args()), Path.cwd())
+
+    def test_confirm_empty_aborts(self):
+        with mock.patch("builtins.input", return_value=""):
+            with self.assertRaises(install.InstallError):
+                install._resolve_target(self._args())
+
+    def test_confirm_eof_aborts(self):
+        with mock.patch("builtins.input", side_effect=EOFError):
+            with self.assertRaises(install.InstallError):
+                install._resolve_target(self._args())
 
 
 class TestCopyArtifact(unittest.TestCase):
@@ -1104,11 +1245,9 @@ class TestInteractivePicker(unittest.TestCase):
 
     def test_all_then_none(self):
         # Within each category: "a" adds all, "n" removes all, "c" continues.
-        # With 4 categories populated in the fixture (agents, hooks, rules, mcp)
-        # we do (a, n, c) for each → all empty at the end.
-        user_input = iter(
-            ["a", "n", "c", "a", "n", "c", "a", "n", "c", "a", "n", "c"]
-        )
+        # 5 categories populated in the fixture (agents, hooks, rules, mcp,
+        # external-skill) → (a, n, c) for each → all empty at the end.
+        user_input = iter(["a", "n", "c"] * 5)
 
         def fake_input(_prompt=""):
             return next(user_input)
@@ -1121,7 +1260,8 @@ class TestInteractivePicker(unittest.TestCase):
     def test_preselected_artifacts_start_checked(self):
         """Artifacts from the receipt appear pre-checked in the picker."""
         # Just press "c" through every category without toggling anything.
-        user_input = iter(["c", "c", "c", "c"])
+        # 5 non-empty categories in the fixture.
+        user_input = iter(["c"] * 5)
 
         def fake_input(_prompt=""):
             return next(user_input)

@@ -3,12 +3,14 @@
 ## Quick start
 
 ```bash
-git clone git@github.com:blancpain/clank.git
-cd clank
-./install.py --target ~/repos/new-project --preset python-sql
+cd ~/repos/new-project
+curl -fsSL https://raw.githubusercontent.com/blancpain/clank/main/install.sh \
+  | sh -s -- --preset python-sql
 ```
 
-That copies every artifact for Python + SQL into `~/repos/new-project/.claude/`, merges hook entries into `settings.json`, and writes a receipt at `~/repos/new-project/.claude/.clank-installed.json`.
+That copies every artifact for Python + SQL into `./.claude/` (you'll be asked to confirm the current directory first), merges hook entries into `settings.json`, and writes a receipt at `./.claude/.clank-installed.json`.
+
+`--target` is still accepted as an explicit override when you can't `cd` into the project first.
 
 ---
 
@@ -33,12 +35,16 @@ That copies every artifact for Python + SQL into `~/repos/new-project/.claude/`,
 
 ## Flags
 
-### `--target <path>` (required unless `--list`)
+### `--target <path>` (optional — defaults to current directory)
 
-Absolute or relative path to the project directory to install into. The directory must exist. clank writes only inside `<target>/.claude/`.
+Absolute or relative path to the project directory to install into. clank writes only inside `<target>/.claude/`.
+
+If omitted, clank uses the current working directory and asks you to confirm (`y/N`) before touching anything. Pass `--force` to accept CWD without a prompt — useful in CI or `curl | sh` flows where no TTY is available.
 
 ```bash
-./install.py --target ~/repos/my-project --preset base-only
+./install.py --preset base-only          # uses CWD (confirms first)
+./install.py --preset base-only --force  # uses CWD, no prompt
+./install.py --target ~/repos/other --preset base-only  # explicit target
 ```
 
 ### `--preset <name>`
@@ -150,10 +156,11 @@ ruff                           [hook      ] (python,lint) — PostToolUse ruff c
 
 ### `--uninstall <id1,id2,...>`
 
-Remove listed artifacts from `--target` and reverse their settings.json fragments. Requires `--target`.
+Remove listed artifacts from the target (defaults to CWD, same as install) and reverse their settings.json fragments.
 
 ```bash
-./install.py --target ~/repos/api --uninstall ruff,python-reviewer
+cd ~/repos/api
+./install.py --uninstall ruff,python-reviewer
 ```
 
 ### `--version`

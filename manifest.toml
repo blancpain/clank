@@ -8,13 +8,16 @@
 #   version              — manifest schema version, currently 1
 #   [[artifacts]]        — one block per artifact:
 #     id                 — stable string identifier, unique across the manifest
-#     type               — "agent" | "hook" | "rule" | "skill" | "plugin-doc"
-#     path               — file path relative to clank root; directory path for skills
+#     type               — "agent" | "hook" | "rule" | "skill" | "external-skill" | "plugin-doc" | "mcp"
+#     path               — file path relative to clank root (directory for skill type).
+#                          Omitted for external-skill, which is fetched via npx at install time.
 #     description        — human-readable one-liner for --list and install summary
 #     tags               — list of strings; used by @tag:<name> expansion in presets
 #     settings_fragment  — (optional) path to the hook's settings.json fragment
 #     default            — (optional) bool; false excludes from @tag/@preset expansion
 #     requires_mcp       — (optional) list of MCP server names; soft hint only
+#     source             — (external-skill only) repo ref passed to `npx skills add`
+#     skill_name         — (external-skill only) `--skill <name>` and install dir name
 #
 #   [presets]            — map of preset name -> list of member selectors
 #     Selectors: artifact ID, "@preset:<name>", "@tag:<name>", or "@tag:*"
@@ -179,6 +182,15 @@ type = "skill"
 path = "base/skills/deploy"
 description = "/deploy — scaffold skill for deployment (user fills in project-specific commands)"
 tags = ["base", "deploy"]
+
+[[artifacts]]
+id = "find-skills"
+type = "external-skill"
+source = "vercel-labs/skills"
+skill_name = "find-skills"
+description = "Discover skills from skills.sh at runtime. Fetched via `npx skills add`; requires Node."
+tags = ["base", "meta"]
+default = false
 
 [[artifacts]]
 id = "plugins-doc"

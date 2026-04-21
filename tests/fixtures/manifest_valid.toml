@@ -37,6 +37,15 @@ mcp_fragment = "addons/sql/mcp/mcp-stub.json"
 description = "Stub MCP server for installer tests"
 tags = ["sql", "test"]
 
+[[artifacts]]
+id = "stub-external-skill"
+type = "external-skill"
+source = "example/repo"
+skill_name = "stub-external"
+description = "Stub external skill for installer tests"
+tags = ["base", "test"]
+default = false
+
 [presets]
 minimal = ["stub-agent"]
 all = ["@tag:*"]
