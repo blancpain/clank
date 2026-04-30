@@ -1,6 +1,6 @@
 # No Redundant Code Review
 
-Do not re-run a code-review subagent (`code-reviewer`, `security-reviewer`, `python-reviewer`, `typescript-reviewer`, `frontend-reviewer`, `go-reviewer`, `rust-reviewer`, `sql-reviewer`, `database-reviewer`, `pipeline-validator`) on a diff that has already been reviewed in this conversation. Once a reviewer returns a verdict, the next step is to act on its findings — not to dispatch another review of the same code.
+Do not re-run a code-review subagent on a diff that has already been reviewed in this conversation. This applies to any agent whose job is to review a diff — typically named `*-reviewer`, plus close cousins like `database-reviewer` or `pipeline-validator`. Once a reviewer returns a verdict, the next step is to act on its findings — not to dispatch another review of the same code.
 
 ## Re-review only if
 
