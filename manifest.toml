@@ -121,6 +121,13 @@ description = "Prefer the project's own code-reviewer agent over generic reviewe
 tags = ["base", "review"]
 
 [[artifacts]]
+id = "no-redundant-review"
+type = "rule"
+path = "base/rules/no-redundant-review.md"
+description = "Don't re-run a review subagent on a diff that's already been reviewed — breaks stop-hook/skill review loops"
+tags = ["base", "review", "process"]
+
+[[artifacts]]
 id = "executing-actions-with-care"
 type = "rule"
 path = "base/rules/executing-actions-with-care.md"
