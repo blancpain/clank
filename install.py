@@ -910,7 +910,7 @@ def install(
     exclude: list[str],
     conflict_policy: str,
     dry_run: bool,
-    stop_hook_opt_in: bool,
+    review_hook_opt_in: bool,
     clank_version: str,
     clank_commit: str,
 ) -> int:
@@ -930,13 +930,13 @@ def install(
         print(f"selection error: {e}", file=sys.stderr)
         return 2
 
-    stop_id = "stop-review-reminder"
+    review_hook_id = "review-before-commit"
     if (
-        stop_id in manifest.artifacts
-        and stop_hook_opt_in
-        and manifest.artifacts[stop_id].get("default") is False
+        review_hook_id in manifest.artifacts
+        and review_hook_opt_in
+        and manifest.artifacts[review_hook_id].get("default") is False
     ):
-        selected.add(stop_id)
+        selected.add(review_hook_id)
 
     if not selected:
         print("no artifacts selected", file=sys.stderr)
@@ -1640,25 +1640,25 @@ def _main_impl(argv: list[str] | None) -> int:
             picked = interactive_pick(manifest_for_picker, preselected=preselected)
         include = sorted(set(include) | picked)
 
-    stop_id = "stop-review-reminder"
+    review_hook_id = "review-before-commit"
+    review_hook_opt_in = False
     manifest_preview = Manifest.load(manifest_path)
-    stop_hook_opt_in = False
     if (
-        stop_id in manifest_preview.artifacts
-        and stop_id not in include
+        review_hook_id in manifest_preview.artifacts
+        and review_hook_id not in include
         and not args.force
         and not args.dry_run
         and not args.interactive
     ):
         answer = (
             input(
-                "Include the stop hook that reminds you to run code-reviewer "
-                "on code changes? [y/N] "
+                "Include the PreToolUse hook that blocks `git commit` once to "
+                "remind you to run code-reviewer? [y/N] "
             )
             .strip()
             .lower()
         )
-        stop_hook_opt_in = answer == "y"
+        review_hook_opt_in = answer == "y"
 
     policy = "overwrite" if args.force else "interactive"
     return install(
@@ -1670,7 +1670,7 @@ def _main_impl(argv: list[str] | None) -> int:
         exclude=exclude,
         conflict_policy=policy,
         dry_run=args.dry_run,
-        stop_hook_opt_in=stop_hook_opt_in,
+        review_hook_opt_in=review_hook_opt_in,
         clank_version=__version__,
         clank_commit=_git_commit(clank_root),
     )

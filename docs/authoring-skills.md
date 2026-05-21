@@ -120,7 +120,7 @@ User-invokable skills follow a consistent pattern:
 
 Example: `/review` invokes `base/skills/review/SKILL.md`. `/deploy` invokes `base/skills/deploy/SKILL.md`. `/querying-db` invokes `addons/sql/skills/querying-db/SKILL.md`.
 
-This pattern comes from ice-scraper, where `/migration` and `/deploy` are user-invokable entry points for project-specific workflows.
+This pattern works well for user-invokable entry points to project-specific workflows.
 
 ---
 

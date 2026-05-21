@@ -77,11 +77,11 @@ description = "PreToolUse Edit|Write guardrails — blocks destructive DDL in ma
 tags = ["base", "safety"]
 
 [[artifacts]]
-id = "stop-review-reminder"
+id = "review-before-commit"
 type = "hook"
-path = "base/hooks/stop-review-reminder.sh"
-settings_fragment = "base/settings.fragments/stop-review-reminder.json"
-description = "Stop hook that reminds you to run code-reviewer on code changes. Installer prompts once before enabling."
+path = "base/hooks/pretooluse-review-before-commit.sh"
+settings_fragment = "base/settings.fragments/pretooluse-review-before-commit.json"
+description = "PreToolUse hook that blocks `git commit` once to remind you to run code-reviewer. Installer prompts once before enabling."
 tags = ["base", "review"]
 default = false
 

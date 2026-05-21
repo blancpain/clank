@@ -72,9 +72,9 @@ Opens a curses picker, one page per category (agents, hooks, rules, skills, exte
 ### Mix a preset with extras or drops
 
 ```bash
-./install.py --preset python --include stop-review-reminder --exclude plugins-doc
+./install.py --preset python --include review-before-commit --exclude plugins-doc
 ```
-`--include` and `--exclude` take comma-separated artifact IDs. `--include` forces an ID in even if it's `default = false` (like `stop-review-reminder`).
+`--include` and `--exclude` take comma-separated artifact IDs. `--include` forces an ID in even if it's `default = false` (like `review-before-commit`).
 
 ### See every available artifact
 
@@ -106,7 +106,7 @@ See [docs/install.md](docs/install.md) for the full flag reference.
 - **Python 3.11+** — the installer uses `tomllib` from the standard library. No third-party packages.
 - **git** — used to record the clank commit in the install receipt. Optional; install proceeds with commit logged as `unknown` if not found.
 - **bash** — all hook scripts are `/bin/bash` scripts.
-- **jq** — required by the base safety hooks (`bash-safety`, `file-safety`, `stop-review-reminder`).
+- **jq** — required by the base safety hooks (`bash-safety`, `file-safety`, `review-before-commit`).
 
 **Optional per-addon tools (auto-detected; hooks bail silently if absent):**
 
@@ -217,9 +217,6 @@ clank/
 
 ## Credits
 
-clank's content draws from two main sources:
-
-- **ice-scraper** — a production NHL analytics pipeline whose `.claude/` configuration (developed over several months in a live environment) is the origin of `code-reviewer`, `database-reviewer`, the PreToolUse bash/file safety hooks, the stop-review-reminder hook, the base rules, the ruff/biome/svelte-check lint hooks, the mcp-postgres-safety hook, the `querying-db` skill, and the `migration` skill. Generalized here to be language-agnostic.
 - **affaan-m/everything-claude-code** — source for the per-language `common-<topic>` rules pattern and for the specialist reviewer agent structure. The addon taxonomy (coding-style / testing / security / patterns per language) follows the split established there.
 
 ## License

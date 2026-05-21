@@ -23,4 +23,4 @@ When something (a reminder, a hook, a skill, your own instinct) prompts a code r
 3. If the diff has grown: review only the new portion, not the full diff.
 4. If no prior review exists: proceed as normal.
 
-The `stop-review-reminder` hook in particular can fire right after a reviewer has finished. Treat the reminder as satisfied if the review just happened — do not re-dispatch.
+The `review-before-commit` hook in particular fires at `git commit` time. If the reviewer just ran on the current diff, treat the block as satisfied — re-run `git commit` (which the hook will pass through within its window) instead of dispatching another review.

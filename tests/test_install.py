@@ -165,7 +165,7 @@ class TestExternalSkill(unittest.TestCase):
                 exclude=[],
                 conflict_policy="skip",
                 dry_run=True,
-                stop_hook_opt_in=False,
+                review_hook_opt_in=False,
                 clank_version="0.1.0",
                 clank_commit="test",
             )
@@ -667,7 +667,7 @@ class TestFullInstall(unittest.TestCase):
             exclude=[],
             conflict_policy="overwrite",
             dry_run=False,
-            stop_hook_opt_in=False,
+            review_hook_opt_in=False,
             clank_version="test",
             clank_commit="testcommit",
         )
@@ -702,7 +702,7 @@ class TestFullInstall(unittest.TestCase):
             exclude=[],
             conflict_policy="overwrite",
             dry_run=False,
-            stop_hook_opt_in=False,
+            review_hook_opt_in=False,
             clank_version="test",
             clank_commit="testcommit",
         )
@@ -731,7 +731,7 @@ class TestFullInstall(unittest.TestCase):
                 exclude=[],
                 conflict_policy="overwrite",
                 dry_run=False,
-                stop_hook_opt_in=False,
+                review_hook_opt_in=False,
                 clank_version="test",
                 clank_commit="testcommit",
             )
@@ -752,7 +752,7 @@ class TestFullInstall(unittest.TestCase):
             exclude=[],
             conflict_policy="overwrite",
             dry_run=False,
-            stop_hook_opt_in=False,
+            review_hook_opt_in=False,
             clank_version="test",
             clank_commit="testcommit",
         )
@@ -783,7 +783,7 @@ class TestFullInstall(unittest.TestCase):
             exclude=[],
             conflict_policy="overwrite",
             dry_run=False,
-            stop_hook_opt_in=False,
+            review_hook_opt_in=False,
             clank_version="test",
             clank_commit="testcommit",
         )
@@ -802,7 +802,7 @@ class TestFullInstall(unittest.TestCase):
                 exclude=[],
                 conflict_policy="overwrite",
                 dry_run=False,
-                stop_hook_opt_in=False,
+                review_hook_opt_in=False,
                 clank_version="test",
                 clank_commit="testcommit",
             )
@@ -830,7 +830,7 @@ class TestDynamicAgentsRule(unittest.TestCase):
             exclude=exclude or [],
             conflict_policy="overwrite",
             dry_run=False,
-            stop_hook_opt_in=False,
+            review_hook_opt_in=False,
             clank_version="test",
             clank_commit="testcommit",
         )
@@ -939,7 +939,7 @@ class TestDynamicAgentsRule(unittest.TestCase):
             exclude=[],
             conflict_policy="overwrite",
             dry_run=True,
-            stop_hook_opt_in=False,
+            review_hook_opt_in=False,
             clank_version="test",
             clank_commit="testcommit",
         )
@@ -968,7 +968,7 @@ class TestRefreshAgents(unittest.TestCase):
             exclude=[],
             conflict_policy="overwrite",
             dry_run=False,
-            stop_hook_opt_in=False,
+            review_hook_opt_in=False,
             clank_version="test",
             clank_commit="testcommit",
         )

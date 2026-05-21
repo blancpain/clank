@@ -24,7 +24,7 @@ That copies every artifact for Python + SQL into `./.claude/` (you'll be asked t
 
 | Tool | Required by |
 |------|-------------|
-| `jq` | `bash-safety`, `file-safety`, `stop-review-reminder` hooks |
+| `jq` | `bash-safety`, `file-safety`, `review-before-commit` hooks |
 | `ruff` | `ruff` hook (Python addon) |
 | `biome` | `biome` hook (TypeScript addon) |
 | `svelte-check` | `svelte-check` hook (TypeScript addon) |
@@ -76,8 +76,8 @@ Available presets:
 Add specific artifact IDs to the selection, composable with `--preset`. Use `./install.py --list` to see all IDs.
 
 ```bash
-# Install the python preset, then also add the stop-review-reminder hook
-./install.py --target ~/repos/api --preset python --include stop-review-reminder
+# Install the python preset, then also add the review-before-commit hook
+./install.py --target ~/repos/api --preset python --include review-before-commit
 ```
 
 ### `--exclude <id1,id2,...>`
@@ -136,7 +136,7 @@ Overwrite all conflicts without prompting. Useful for re-running the installer a
 ./install.py --target ~/repos/api --preset python --force
 ```
 
-`--force` also skips the stop-hook opt-in prompt (defaults to "no" unless `stop-review-reminder` was explicitly passed via `--include`).
+`--force` also skips the review-before-commit opt-in prompt (defaults to "no" unless `review-before-commit` was explicitly passed via `--include`).
 
 ### `--list`
 
@@ -184,11 +184,11 @@ When you run the installer, the following happens in order:
 
 3. **Safety checks.** The target must exist and be a directory. If `manifest.toml` and a `base/` directory are found at the target root, the installer refuses to run (this would be installing clank into itself). `<target>/.claude/` is created if it doesn't exist.
 
-4. **Stop-hook prompt.** Unless `--force` or `--dry-run`, the installer asks once:
+4. **Review-before-commit prompt.** Unless `--force` or `--dry-run`, the installer asks once:
    ```
-   Include the stop hook that reminds you to run code-reviewer on code changes? [y/N]
+   Include the PreToolUse hook that blocks `git commit` once to remind you to run code-reviewer? [y/N]
    ```
-   Answering `y` adds `stop-review-reminder` to the selection. This artifact's `default = false` flag prevents it from being pulled in silently by any preset.
+   Answering `y` adds `review-before-commit` to the selection. This artifact's `default = false` flag prevents it from being pulled in silently by any preset.
 
 5. **Copy files.** For each selected artifact, the source path is mapped to a destination under `<target>/.claude/` by stripping the `base/` or `addons/<name>/` prefix. Skills (directories) are copied recursively, file by file. Hooks have their executable bit set after copying. Conflicts are handled per-file (see below).
 
@@ -206,15 +206,15 @@ When you run the installer, the following happens in order:
 
 **`@tag:*`** selects every artifact in the manifest, including those in addons. This is what `all` uses.
 
-**`default = false`** marks an artifact that should never be pulled in by preset or tag expansion — only by an explicit `--include <id>`. Currently only `stop-review-reminder` uses this flag. It still appears in `--list` output.
+**`default = false`** marks an artifact that should never be pulled in by preset or tag expansion — only by an explicit `--include <id>`. Currently only `review-before-commit` uses this flag. It still appears in `--list` output.
 
 **Composition example:**
 
 ```bash
-# Start with python preset, add the stop hook explicitly, drop the plugin doc
+# Start with python preset, add the review-before-commit hook explicitly, drop the plugin doc
 ./install.py --target ~/repos/api \
   --preset python \
-  --include stop-review-reminder \
+  --include review-before-commit \
   --exclude plugins-doc
 ```
 

@@ -53,7 +53,7 @@ Non-negotiable when adding or editing artifacts:
 5. **Every `settings_fragment` must be valid JSON** — the manifest lint step verifies this at install time. A malformed fragment aborts the install before touching the target.
 6. **Skill paths are directories, agent/hook/rule/plugin-doc paths are files.** Don't mix. The installer maps type to destination differently for skills vs. file-based artifacts.
 7. **Hooks are executable** — run `chmod +x` after creating a hook script. The installer preserves the executable bit, but the source file in clank must already be executable.
-8. **Lift and strip, don't invent** — when adapting content from ice-scraper or affaan-m, keep the proven content and strip the project-specific parts. Don't rewrite from scratch unless there's genuinely no source material to work from.
+8. **Lift and strip, don't invent** — when adapting content from an upstream source (e.g. affaan-m), keep the proven content and strip the project-specific parts. Don't rewrite from scratch unless there's genuinely no source material to work from.
 
 ## Running tests
 
@@ -65,7 +65,4 @@ Tests cover: manifest loading and lint, selection resolution (preset expansion, 
 
 ## Source attribution
 
-Content in clank comes from two main sources, both worth crediting:
-
-- **ice-scraper** (a production NHL analytics pipeline) — origin of `code-reviewer`, `database-reviewer`, the PreToolUse bash/file safety hooks, the `stop-review-reminder` hook, the base rules (`code-review`, `long-running-scripts`, `no-inline-comments`, `update-agent-memory`, `use-project-code-reviewer`), the Python reviewer depth sections, the ruff/biome/svelte-check lint hooks, the `pretooluse-mcp-postgres-safety` hook, the `querying-db` skill, and the `migration` skill. Generalized to be language-agnostic.
 - **affaan-m/everything-claude-code** — source for the per-language `common-<topic>` rules pattern and for `rules/common/agents.md`, `rules/common/testing.md`, `rules/common/coding-style.md`. The addon taxonomy (coding-style / testing / security / patterns per language) follows the split established there.
