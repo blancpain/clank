@@ -62,11 +62,9 @@ claude plugin install feature-dev
 
 | Plugin | Description |
 |--------|-------------|
-| `mgrep` | Enhanced grep — better than ripgrep for some large-codebase search patterns |
 | `context7` | Live documentation lookup — companion to the `docs-researcher` agent in clank |
 
 ```bash
-claude plugin install mgrep
 claude plugin install context7
 ```
 
