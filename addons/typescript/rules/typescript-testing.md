@@ -4,8 +4,7 @@ Follow these TypeScript-specific testing conventions in addition to the general 
 
 ## Test Runner
 
-- Prefer **Vitest** for new projects — faster, native ESM, compatible with Jest APIs.
-- Use **Jest** only when existing projects are already on it or when specific Jest plugins are required.
+- Use **Jest** as the test runner. In existing projects, keep whatever runner is already configured rather than migrating.
 - Use **React Testing Library** (RTL) for component tests — test behavior from the user's perspective, not implementation details.
 - Use **Playwright** for E2E tests of critical user flows.
 
@@ -58,24 +57,23 @@ const result = await handler(request as any);
 const result = await handler(createMockRequest({ method: 'GET', path: '/users' }));
 ```
 
-## Mocking with `vi.mock` (Vitest) / `jest.mock`
+## Mocking with `jest.mock`
 
 - Mock at the module boundary, not deep inside functions
-- Use `vi.fn()` / `jest.fn()` with explicit return types so callers are type-safe
-- Reset mocks between tests with `vi.clearAllMocks()` in `beforeEach` or `afterEach`
+- Use `jest.fn()` with explicit return types so callers are type-safe
+- Reset mocks between tests with `jest.clearAllMocks()` in `beforeEach` or `afterEach`
 
 ```typescript
-import { vi } from 'vitest';
 import * as api from '@/lib/api';
 
-vi.mock('@/lib/api');
+jest.mock('@/lib/api');
 
 beforeEach(() => {
-  vi.clearAllMocks();
+  jest.clearAllMocks();
 });
 
 it('calls the API with the correct user id', async () => {
-  vi.mocked(api.fetchUser).mockResolvedValue({ id: '1', name: 'Alice' });
+  jest.mocked(api.fetchUser).mockResolvedValue({ id: '1', name: 'Alice' });
 
   const result = await getDisplayName('1');
 
@@ -97,7 +95,7 @@ import userEvent from '@testing-library/user-event';
 
 it('submits the form when the user clicks Save', async () => {
   const user = userEvent.setup();
-  const onSubmit = vi.fn();
+  const onSubmit = jest.fn();
 
   render(<EditForm onSubmit={onSubmit} />);
 
