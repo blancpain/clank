@@ -315,7 +315,7 @@ tags = ["typescript", "style"]
 id = "typescript-testing"
 type = "rule"
 path = "addons/typescript/rules/typescript-testing.md"
-description = "TypeScript testing patterns — vitest, jest, RTL"
+description = "TypeScript testing patterns — jest, RTL"
 tags = ["typescript", "testing"]
 
 [[artifacts]]

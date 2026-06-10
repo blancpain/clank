@@ -5,7 +5,7 @@ Follow these TypeScript-specific conventions in addition to the general coding s
 ## Standards
 
 - Use **TypeScript strict mode** (`"strict": true` in `tsconfig.json`). Also enable `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes` where feasible.
-- Use **biome** for linting and formatting (preferred over ESLint + Prettier separately).
+- Use **biome** for linting and formatting in new projects (preferred over ESLint + Prettier separately). In existing projects, keep the established ESLint + Prettier setup — do not migrate without an explicit decision.
 - Target **ES2022+** — use `structuredClone`, `Object.hasOwn`, `Array.at()`, and `at()` instead of older polyfill equivalents.
 
 ## Naming
