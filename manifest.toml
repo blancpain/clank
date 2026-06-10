@@ -367,7 +367,7 @@ id = "pg-mcp"
 type = "mcp"
 path = "addons/sql/mcp/pg-mcp-wrapper.sh"
 mcp_fragment = "addons/sql/mcp/mcp-postgres.json"
-description = "Postgres MCP server — reads DB_URL from .env, launches @modelcontextprotocol/server-postgres"
+description = "Postgres MCP server — reads DB_URL (or a named var per server, multi-DB capable) from .env/.env.local, launches @modelcontextprotocol/server-postgres (read-only)"
 tags = ["sql", "postgres"]
 
 [[artifacts]]
@@ -440,7 +440,7 @@ id = "supabase-mcp"
 type = "mcp"
 path = "addons/supabase/mcp/supabase-mcp-wrapper.sh"
 mcp_fragment = "addons/supabase/mcp/mcp-supabase.json"
-description = "Supabase MCP server — reads SUPABASE_ACCESS_TOKEN + SUPABASE_PROJECT_REF from .env, launches @supabase/mcp-server-supabase in --read-only mode"
+description = "Supabase MCP server (CLOUD-ONLY — Management API; for self-hosted use pg-mcp) — reads SUPABASE_ACCESS_TOKEN + SUPABASE_PROJECT_REF from .env, launches @supabase/mcp-server-supabase in --read-only mode"
 tags = ["supabase"]
 
 [[artifacts]]

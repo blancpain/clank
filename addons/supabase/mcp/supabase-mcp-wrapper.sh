@@ -1,5 +1,12 @@
 #!/bin/bash
 # Wrapper to start the Supabase MCP server with credentials from project .env.
+#
+# CLOUD-ONLY: @supabase/mcp-server-supabase talks to the Supabase Management
+# API (supabase.com) — it needs a personal access token + cloud project ref and
+# CANNOT connect to self-hosted instances (no Management API there). For
+# self-hosted Supabase, use the `pg-mcp` artifact (sql addon) pointed at the
+# instance's Postgres instead; it supports multiple databases via named env vars.
+#
 # Requires: npx available in PATH
 # Requires: SUPABASE_ACCESS_TOKEN and SUPABASE_PROJECT_REF set in the project's .env file
 #
