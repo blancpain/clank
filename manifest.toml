@@ -479,6 +479,41 @@ path = "addons/rust/rules/rust-security.md"
 description = "Rust security — unsafe discipline, cargo audit, bounds checks"
 tags = ["rust", "security"]
 
+[[artifacts]]
+id = "swift-reviewer"
+type = "agent"
+path = "addons/swift/agents/swift-reviewer.md"
+description = "Swift/SwiftUI specialist reviewer — retain cycles, actors/MainActor, SwiftUI state, force unwraps, persistence pitfalls"
+tags = ["swift", "review"]
+
+[[artifacts]]
+id = "swift-coding-style"
+type = "rule"
+path = "addons/swift/rules/swift-coding-style.md"
+description = "Swift coding style — API design guidelines, value types, access control, idioms"
+tags = ["swift", "style"]
+
+[[artifacts]]
+id = "swiftui-patterns"
+type = "rule"
+path = "addons/swift/rules/swiftui-patterns.md"
+description = "SwiftUI patterns — state ownership, Observation framework, identity, lifecycle, multiplatform"
+tags = ["swift", "style"]
+
+[[artifacts]]
+id = "swift-testing"
+type = "rule"
+path = "addons/swift/rules/swift-testing.md"
+description = "Swift testing — Swift Testing framework, real in-memory DBs over mocks, merge-logic coverage"
+tags = ["swift", "testing"]
+
+[[artifacts]]
+id = "ios-run"
+type = "skill"
+path = "addons/swift/skills/ios-run"
+description = "Build/install/run iOS+watchOS apps from the CLI — simctl, devicectl, paired watch sims, signing gotchas"
+tags = ["swift", "workflow"]
+
 [presets]
 minimal = ["bash-safety", "file-safety", "code-reviewer", "executing-actions-with-care"]
 base-only = ["@tag:base"]
@@ -488,6 +523,7 @@ sql = ["@preset:base-only", "sql-reviewer", "mcp-postgres-safety", "schema-sync-
 supabase = ["@preset:base-only", "mcp-supabase-safety", "supabase-mcp"]
 go = ["@preset:base-only", "go-reviewer", "golangci-lint", "golang-coding-style", "golang-testing", "golang-security", "golang-patterns"]
 rust = ["@preset:base-only", "rust-reviewer", "cargo-clippy", "rust-coding-style", "rust-testing", "rust-security"]
+swift = ["@preset:base-only", "swift-reviewer", "swift-coding-style", "swiftui-patterns", "swift-testing", "ios-run"]
 python-sql = ["@preset:python", "@preset:sql"]
 typescript-sql = ["@preset:typescript", "@preset:sql"]
 fullstack-python = ["@preset:python", "@preset:typescript", "@preset:sql"]
