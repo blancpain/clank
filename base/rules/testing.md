@@ -19,7 +19,7 @@ MANDATORY workflow:
 
 ## Troubleshooting Test Failures
 
-1. Consult `superpowers:test-driven-development` skill
+1. If the `superpowers` plugin is installed, consult its `test-driven-development` skill (do not assume it is available)
 2. Check test isolation
 3. Verify mocks are correct
 4. Fix implementation, not tests (unless tests are wrong)
