@@ -191,6 +191,13 @@ description = "/deploy — scaffold skill for deployment (user fills in project-
 tags = ["base", "deploy"]
 
 [[artifacts]]
+id = "handoff"
+type = "skill"
+path = "base/skills/handoff"
+description = "/handoff — end-of-session tidy-up: close open loops, sync plan docs + memory, leave the project pick-up-able by a fresh agent"
+tags = ["base", "process"]
+
+[[artifacts]]
 id = "find-skills"
 type = "external-skill"
 source = "vercel-labs/skills"
