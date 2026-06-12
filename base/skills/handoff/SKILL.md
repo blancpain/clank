@@ -19,8 +19,10 @@ Check for anything still moving or unsaved:
 ```bash
 git status --short --branch
 git log @{upstream}..HEAD --oneline 2>/dev/null
-git branch --no-merged main 2>/dev/null
+git branch --no-merged "$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null || echo main)" 2>/dev/null
 ```
+
+(Use the repo's actual default/integration branch — don't assume `main`.)
 
 - **Background tasks/agents still running** — wait for them or report what was
   abandoned and why.

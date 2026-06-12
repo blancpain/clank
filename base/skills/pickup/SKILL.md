@@ -14,6 +14,11 @@ a recorded "next step" until you have confirmed it is still the next step.
 If the user passed a topic argument, scope the pickup to it; otherwise pick up
 whatever the memory/plan docs mark as the active thread.
 
+If the project has **no** memory or plan docs (fresh repo, or one that has
+never had a handoff), say so and orient from what exists instead: recent
+commits on the default branch, open PRs, README/CLAUDE.md — then suggest
+creating the missing plan/memory entries as part of the session.
+
 ## Step 1: Gather the written state
 
 - Read the auto-memory index (`MEMORY.md`) and **open the topic files** behind
@@ -30,10 +35,15 @@ whatever the memory/plan docs mark as the active thread.
 ```bash
 git fetch --quiet
 git status --short --branch
-git log origin/main --oneline -10
+DEFAULT=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null || echo origin/main)
+git log "$DEFAULT" --oneline -10
 gh pr list --state open 2>/dev/null
 gh pr list --state merged --limit 5 2>/dev/null
 ```
+
+(Use the repo's actual default/integration branch throughout — don't assume
+`main`. If there's no GitHub remote, skip the `gh` checks and rely on
+branch/log comparison.)
 
 - **PRs**: did anything merge (or get closed) since the written state? Did a
   stacked/dependent PR land in the right base? Don't trust a MERGED state
