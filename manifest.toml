@@ -198,6 +198,13 @@ description = "/handoff — end-of-session tidy-up: close open loops, sync plan 
 tags = ["base", "process"]
 
 [[artifacts]]
+id = "pickup"
+type = "skill"
+path = "base/skills/pickup"
+description = "/pickup — start-of-session orientation: read memory + plan docs, verify them against repo/PR/prod reality, produce a trusted next step (mirror of /handoff)"
+tags = ["base", "process"]
+
+[[artifacts]]
 id = "find-skills"
 type = "external-skill"
 source = "vercel-labs/skills"
