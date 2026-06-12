@@ -83,6 +83,95 @@ class TestManifestLint(unittest.TestCase):
         self.assertTrue(any("does not exist" in e for e in errors))
 
 
+def _read_frontmatter(skill_md: Path) -> dict[str, str]:
+    """Parse the simple `key: value` YAML frontmatter of a SKILL.md."""
+    lines = skill_md.read_text().splitlines()
+    if not lines or lines[0].strip() != "---":
+        return {}
+    fields: dict[str, str] = {}
+    for line in lines[1:]:
+        if line.strip() == "---":
+            break
+        if ":" in line and not line.startswith((" ", "\t")):
+            key, _, value = line.partition(":")
+            fields[key.strip()] = value.strip().strip('"')
+    return fields
+
+
+class TestRealManifest(unittest.TestCase):
+    """Validate the repo's actual manifest.toml and the artifacts it points at.
+
+    The other test classes exercise the installer against fixtures; this one
+    guards the real content, so adding an artifact (e.g. a new skill) without
+    registering it correctly fails CI.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.manifest = install.Manifest.load(CLANK_ROOT / "manifest.toml")
+
+    def test_real_manifest_lints_clean(self):
+        errors = install.lint_manifest(self.manifest, CLANK_ROOT)
+        self.assertEqual(errors, [])
+
+    def _skill_artifacts(self):
+        return {
+            aid: a
+            for aid, a in self.manifest.artifacts.items()
+            if a.get("type") == "skill"
+        }
+
+    def test_every_skill_dir_on_disk_is_registered(self):
+        registered = {
+            str(Path(a["path"])) for a in self._skill_artifacts().values()
+        }
+        on_disk = {
+            str(p.parent.relative_to(CLANK_ROOT))
+            for d in ("base", "addons")
+            for p in (CLANK_ROOT / d).rglob("SKILL.md")
+        }
+        self.assertEqual(on_disk - registered, set())
+
+    def test_every_skill_has_skill_md(self):
+        for aid, artifact in self._skill_artifacts().items():
+            skill_md = CLANK_ROOT / artifact["path"] / "SKILL.md"
+            self.assertTrue(skill_md.is_file(), f"{aid}: missing SKILL.md")
+
+    def test_skill_frontmatter_name_matches_directory(self):
+        for aid, artifact in self._skill_artifacts().items():
+            skill_md = CLANK_ROOT / artifact["path"] / "SKILL.md"
+            fields = _read_frontmatter(skill_md)
+            self.assertEqual(
+                fields.get("name"),
+                Path(artifact["path"]).name,
+                f"{aid}: frontmatter name must match the skill directory name",
+            )
+
+    def test_skill_frontmatter_has_description(self):
+        for aid, artifact in self._skill_artifacts().items():
+            skill_md = CLANK_ROOT / artifact["path"] / "SKILL.md"
+            fields = _read_frontmatter(skill_md)
+            self.assertTrue(
+                fields.get("description"),
+                f"{aid}: frontmatter must include a non-empty description",
+            )
+
+    def test_handoff_and_pickup_are_mirror_pair(self):
+        skills = self._skill_artifacts()
+        self.assertIn("handoff", skills)
+        self.assertIn("pickup", skills)
+        for aid in ("handoff", "pickup"):
+            fields = _read_frontmatter(
+                CLANK_ROOT / skills[aid]["path"] / "SKILL.md"
+            )
+            self.assertEqual(
+                fields.get("disable-model-invocation"),
+                "true",
+                f"{aid}: must be user-invoked only (disable-model-invocation)",
+            )
+            self.assertEqual(skills[aid].get("tags"), ["base", "process"])
+
+
 class TestExternalSkill(unittest.TestCase):
     """Install/uninstall flow for the external-skill artifact type."""
 
