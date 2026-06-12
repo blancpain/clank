@@ -22,7 +22,16 @@ from typing import Callable
 
 __version__ = "0.1.0"
 
-VALID_TYPES = {"agent", "hook", "rule", "skill", "external-skill", "plugin-doc", "mcp"}
+VALID_TYPES = {
+    "agent",
+    "hook",
+    "rule",
+    "skill",
+    "external-skill",
+    "plugin-doc",
+    "mcp",
+    "scaffold",
+}
 
 
 class Manifest:
@@ -91,6 +100,18 @@ def lint_manifest(manifest: Manifest, clank_root: Path) -> list[str]:
             errors.append(
                 f"{aid}: skill path must be a directory, got file: {artifact['path']}"
             )
+
+        if artifact.get("type") == "scaffold":
+            dest = artifact.get("dest")
+            if not dest:
+                errors.append(f"{aid}: scaffold requires 'dest' field")
+            else:
+                dest_path = Path(dest)
+                if dest_path.is_absolute() or ".." in dest_path.parts:
+                    errors.append(
+                        f"{aid}: scaffold dest must be relative and stay "
+                        f"inside the target: {dest}"
+                    )
 
         frag = artifact.get("settings_fragment")
         if frag:
@@ -182,6 +203,26 @@ def copy_artifact(
     src = clank_root / artifact["path"]
     dst = _artifact_destination(artifact, target)
 
+    if artifact.get("type") == "scaffold":
+        # Scaffolds seed project content (plan docs, changelogs) at the
+        # project root. They are created once and then owned by the project:
+        # never overwritten on reinstall, regardless of conflict policy.
+        # The manifest lint rejects ".." and absolute dests, but only the
+        # filesystem knows about symlinks: an intermediate directory linked
+        # outside the target would silently redirect the write.
+        try:
+            dst.resolve().relative_to(target.resolve())
+        except ValueError:
+            raise InstallError(
+                f"scaffold dest {artifact['dest']!r} resolves outside the "
+                f"target (symlink escape?): {dst.resolve()}"
+            )
+        if dst.exists():
+            return False
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dst)
+        return True
+
     if artifact.get("type") == "skill":
         return _copy_directory(src, dst, on_conflict)
     copied = _copy_file(src, dst, on_conflict)
@@ -192,7 +233,14 @@ def copy_artifact(
 
 
 def _artifact_destination(artifact: dict, target: Path) -> Path:
-    """Compute where an artifact lands under target/.claude/."""
+    """Compute where an artifact lands under target/.claude/.
+
+    Scaffolds are the exception: their manifest `dest` is relative to the
+    project root, not `.claude/` — they seed project files like
+    `docs/plan.md`. Lint guarantees `dest` is relative and `..`-free.
+    """
+    if artifact.get("type") == "scaffold":
+        return target / artifact["dest"]
     src_path = Path(artifact["path"])
     parts = src_path.parts
     if parts[0] == "base":
@@ -782,6 +830,13 @@ def uninstall(
             installed.discard(aid)
             continue
 
+        if artifact.get("type") == "scaffold":
+            # Scaffolded files become project content the moment they're
+            # created (the team's plan, the changelog). Uninstall only
+            # forgets the receipt entry — it never deletes the file.
+            installed.discard(aid)
+            continue
+
         dst = _artifact_destination(artifact, target)
 
         if artifact.get("type") == "skill":
@@ -966,7 +1021,12 @@ def install(
         src = clank_root / artifact["path"]
         dst = _artifact_destination(artifact, target)
         if dry_run:
-            print(f"[dry-run] copy {src} -> {dst}")
+            # Scaffolds skip silently when the file exists; the preview must
+            # say so rather than promise a copy the real run won't do.
+            if artifact.get("type") == "scaffold" and dst.exists():
+                print(f"[dry-run] skip {dst} (scaffold already exists)")
+            else:
+                print(f"[dry-run] copy {src} -> {dst}")
             copied_ids.append(aid)
             continue
         copied = copy_artifact(artifact, clank_root, target, on_conflict)
@@ -1145,6 +1205,7 @@ CATEGORIES = [
     ("external-skill", "External skills (npx)"),
     ("mcp", "MCP servers"),
     ("plugin-doc", "Plugin docs"),
+    ("scaffold", "Project doc scaffolds"),
 ]
 
 

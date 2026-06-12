@@ -33,6 +33,7 @@ Sub-agents, skills, and hooks are orthogonal mechanisms — pick deliberately:
 - `manifest.toml` — the source of truth for every shipped artifact. Every new artifact goes here or it doesn't ship. The installer reads the manifest, not the filesystem.
 - `install.py` — the installer. Stdlib Python 3.11+ only (uses `tomllib`, `shutil`, `json`, `argparse`). Tested via `tests/test_install.py`.
 - `base/` — language-agnostic artifacts (agents, hooks, rules, skills, plugins, settings.json, settings.fragments/). Copied into `<target>/.claude/` regardless of language preset. The `base/` prefix is stripped at install time.
+- `base/templates/` — scaffold sources (manifest type `scaffold`). Unlike every other artifact these land at the **target project root** (manifest `dest`, e.g. `docs/plan.md`, `CHANGELOG.md`), are created only when missing, and are never overwritten or uninstalled — they seed project content the project then owns. The convention they implement lives in `base/rules/project-docs.md`.
 - `addons/<lang>/` — per-language specializations (python, typescript, go, rust, sql). Only copied if the selected preset includes that language. The `addons/<lang>/` prefix is stripped; everything lands under `<target>/.claude/` with the same structure as `base/`.
 - `docs/` — authoring guides (`authoring-agents.md`, `authoring-hooks.md`, `authoring-skills.md`, `authoring-rules.md`, `adding-an-addon.md`) and the install reference (`install.md`). These are clank's own documentation and are NOT copied into target projects.
 - `tests/` — stdlib unittest tests for the installer. Run via `python3 -m unittest tests.test_install -v`.
@@ -54,6 +55,7 @@ Non-negotiable when adding or editing artifacts:
 6. **Skill paths are directories, agent/hook/rule/plugin-doc paths are files.** Don't mix. The installer maps type to destination differently for skills vs. file-based artifacts.
 7. **Hooks are executable** — run `chmod +x` after creating a hook script. The installer preserves the executable bit, but the source file in clank must already be executable.
 8. **Lift and strip, don't invent** — when adapting content from an upstream source (e.g. affaan-m), keep the proven content and strip the project-specific parts. Don't rewrite from scratch unless there's genuinely no source material to work from.
+9. **Every installer behavior change ships with tests** — new artifact types, manifest fields, lint rules, copy/merge/uninstall semantics, CLI flags: each gets deterministic coverage in `tests/test_install.py` before it merges (happy path + the guard rails, e.g. "never overwrites", "lint rejects X"). Prompt-only artifacts (agents/skills/rules content) are exempt, but their *registration* is still covered by the real-manifest lint test — which is also why every new artifact must land in `manifest.toml` in the same change (rule 4): `test_real_manifest_lints_clean` only protects what the manifest declares.
 
 ## Running tests
 
@@ -61,7 +63,7 @@ Non-negotiable when adding or editing artifacts:
 python3 -m unittest tests.test_install -v
 ```
 
-Tests cover: manifest loading and lint, selection resolution (preset expansion, @tag:*, @tag:<name>, default=false), copy logic (file vs. directory), settings.json merge (hook arrays, permissions), install receipt writing and updating, uninstall round-trip, full `install()` orchestration, and the interactive picker.
+Tests cover: manifest loading and lint, selection resolution (preset expansion, @tag:*, @tag:<name>, default=false), copy logic (file vs. directory), settings.json merge (hook arrays, permissions), install receipt writing and updating, uninstall round-trip, scaffold semantics (copy-if-missing, never-overwrite, uninstall keeps the file), full `install()` orchestration, and the interactive picker.
 
 ## Source attribution
 

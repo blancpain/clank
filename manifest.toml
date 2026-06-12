@@ -8,9 +8,11 @@
 #   version              — manifest schema version, currently 1
 #   [[artifacts]]        — one block per artifact:
 #     id                 — stable string identifier, unique across the manifest
-#     type               — "agent" | "hook" | "rule" | "skill" | "external-skill" | "plugin-doc" | "mcp"
+#     type               — "agent" | "hook" | "rule" | "skill" | "external-skill" | "plugin-doc" | "mcp" | "scaffold"
 #     path               — file path relative to clank root (directory for skill type).
 #                          Omitted for external-skill, which is fetched via npx at install time.
+#     dest               — (scaffold only) destination relative to the TARGET PROJECT ROOT
+#                          (not .claude/). Created only if missing; never overwritten or uninstalled.
 #     description        — human-readable one-liner for --list and install summary
 #     tags               — list of strings; used by @tag:<name> expansion in presets
 #     settings_fragment  — (optional) path to the hook's settings.json fragment
@@ -196,6 +198,32 @@ type = "skill"
 path = "base/skills/handoff"
 description = "/handoff — end-of-session tidy-up: close open loops, sync plan docs + memory, leave the project pick-up-able by a fresh agent"
 tags = ["base", "process"]
+
+# project-docs + plan-doc + changelog-doc travel together: the rule is the
+# contract /pickup and /handoff rely on, the scaffolds seed the files it
+# mandates. All three carry the "base" tag so every preset gets the set.
+[[artifacts]]
+id = "project-docs"
+type = "rule"
+path = "base/rules/project-docs.md"
+description = "Canonical project doc set — docs/plan.md + CHANGELOG.md + CLAUDE.md Status pointer; the contract /pickup and /handoff rely on"
+tags = ["base", "process", "docs"]
+
+[[artifacts]]
+id = "plan-doc"
+type = "scaffold"
+path = "base/templates/plan.md"
+dest = "docs/plan.md"
+description = "docs/plan.md skeleton (Now / Queued / Later) — created only if missing, never overwritten, never uninstalled"
+tags = ["base", "docs"]
+
+[[artifacts]]
+id = "changelog-doc"
+type = "scaffold"
+path = "base/templates/CHANGELOG.md"
+dest = "CHANGELOG.md"
+description = "CHANGELOG.md skeleton (dated, newest-first) — created only if missing, never overwritten, never uninstalled"
+tags = ["base", "docs"]
 
 [[artifacts]]
 id = "pickup"

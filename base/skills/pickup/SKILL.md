@@ -16,17 +16,19 @@ whatever the memory/plan docs mark as the active thread.
 
 If the project has **no** memory or plan docs (fresh repo, or one that has
 never had a handoff), say so and orient from what exists instead: recent
-commits on the default branch, open PRs, README/CLAUDE.md — then suggest
-creating the missing plan/memory entries as part of the session.
+commits on the default branch, open PRs, README/CLAUDE.md — then create the
+missing canonical docs (`docs/plan.md`, `CHANGELOG.md`, a `## Status`
+section in CLAUDE.md — see `rules/project-docs.md`) as part of the session.
 
 ## Step 1: Gather the written state
 
 - Read the auto-memory index (`MEMORY.md`) and **open the topic files** behind
   every entry relevant to the task — the index lines are hooks, not content.
-- Follow `CLAUDE.md` pointers to plan/progress docs (e.g. `specs/PLAN.md`,
-  feature plan files, `TODO.md`) and read the sections marked in-progress or
-  "next".
-- Note the changelog's `[Unreleased]` section — it lists what recently shipped.
+- Read the canonical docs (see `rules/project-docs.md`): `docs/plan.md`
+  (the `## Now` and `## Queued` sections) and the top of `CHANGELOG.md`
+  (what recently shipped). If the project predates the convention, follow
+  the `CLAUDE.md` `## Status` pointer to wherever its plan docs actually
+  live (e.g. `specs/PLAN.md`, `TODO.md`).
 - Collect every concrete claim worth verifying: "PR #N merged", "deployed",
   "verified on prod", "expires on \<date\>", "branch X awaiting review".
 

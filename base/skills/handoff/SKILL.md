@@ -35,8 +35,11 @@ git branch --no-merged "$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/d
 
 ## Step 2: Sync the plan documents
 
-Locate the project's plan/progress docs — check `CLAUDE.md` for pointers
-(e.g. `specs/PLAN.md`, feature-specific plan files, `TODO.md`). For each one
+The canonical plan doc is `docs/plan.md` (see `rules/project-docs.md`); in a
+project that predates the convention, follow the `CLAUDE.md` `## Status`
+pointer to wherever its plan docs live (e.g. `specs/PLAN.md`, `TODO.md`). If
+the canonical docs are missing entirely, create them per the convention as
+part of this handoff — never overwrite existing content. For each plan doc
 touched by this session's work:
 
 - Mark completed items done **with the date and PR number**.
@@ -49,9 +52,11 @@ touched by this session's work:
 
 ## Step 3: Update the changelog
 
-If the project keeps a changelog, confirm everything that shipped this
-session has a terse entry (with PR/issue number) in the right section. One
-line per change; trivial edits need no entry.
+Confirm everything that shipped this session has a terse, dated entry (with
+PR/issue number) at the top of `CHANGELOG.md` — shipped items move OUT of
+the plan and INTO the changelog, in the same handoff. One line per change;
+trivial edits need no entry. Refresh the `## Status` section in `CLAUDE.md`
+if the current focus changed.
 
 ## Step 4: Update persistent memory
 

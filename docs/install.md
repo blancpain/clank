@@ -312,7 +312,7 @@ For each listed artifact ID, the uninstaller:
 
 ## Safety guarantees
 
-- **Only writes artifacts under `<target>/.claude/`.** All artifact files land under `.claude/`. The receipt lives at `.claude/.clank-installed.json`. MCP fragments land at `<target>/.mcp.json`.
+- **Only writes artifacts under `<target>/.claude/`** — with two documented exceptions: MCP fragments land at `<target>/.mcp.json`, and `scaffold` artifacts seed project files at their manifest `dest` (e.g. `docs/plan.md`, `CHANGELOG.md`). Scaffolds are created **only if the file is missing**, are never overwritten on reinstall (the conflict policy is not consulted), and are never deleted by `--uninstall` — once created they are project content. The receipt lives at `.claude/.clank-installed.json`.
 - **Touches `<target>/CLAUDE.md` in one specific spot.** When a review agent is installed, the installer injects (or refreshes) a "Before ending a coding turn" block between the markers `<!-- clank:end-of-turn-review:begin -->` and `<!-- clank:end-of-turn-review:end -->`. If `CLAUDE.md` doesn't exist it's created; if it does, the block is appended. Re-installs replace the block in place; uninstalling every review agent strips the block entirely. The table rows reflect only the review agents actually installed (e.g. `python-reviewer` row only appears if that agent is selected). Everything outside the markers is left untouched.
 - **Never deletes files not in the receipt.** `--uninstall` only removes IDs that appear in `.clank-installed.json`.
 - **Refuses to install into itself.** If `--target` has both a `manifest.toml` and a `base/` directory at its root, the installer aborts with `"refusing to install into clank itself"`.

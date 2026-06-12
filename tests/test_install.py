@@ -1370,6 +1370,141 @@ class TestInteractivePicker(unittest.TestCase):
         self.assertIn("[x]", display)
 
 
+class TestScaffold(unittest.TestCase):
+    """Install/uninstall flow for the scaffold artifact type."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.clank_root = Path(self.tmp.name) / "clank"
+        (self.clank_root / "base" / "templates").mkdir(parents=True)
+        self.template = self.clank_root / "base" / "templates" / "plan.md"
+        self.template.write_text("# Plan\n\n## Now\n")
+        self.target = Path(self.tmp.name) / "project"
+        (self.target / ".claude").mkdir(parents=True)
+        self.artifact = {
+            "id": "plan-doc",
+            "type": "scaffold",
+            "path": "base/templates/plan.md",
+            "dest": "docs/plan.md",
+        }
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _abort(self, _dst):
+        raise AssertionError("scaffold must never consult the conflict policy")
+
+    def test_copied_to_project_root_when_missing(self):
+        copied = install.copy_artifact(
+            self.artifact, self.clank_root, self.target, self._abort
+        )
+        self.assertTrue(copied)
+        dst = self.target / "docs" / "plan.md"
+        self.assertEqual(dst.read_text(), "# Plan\n\n## Now\n")
+
+    def test_existing_file_never_overwritten(self):
+        dst = self.target / "docs" / "plan.md"
+        dst.parent.mkdir(parents=True)
+        dst.write_text("# My real plan\n")
+        copied = install.copy_artifact(
+            self.artifact, self.clank_root, self.target, self._abort
+        )
+        self.assertFalse(copied)
+        self.assertEqual(dst.read_text(), "# My real plan\n")
+
+    def test_reinstall_is_idempotent(self):
+        install.copy_artifact(self.artifact, self.clank_root, self.target, self._abort)
+        dst = self.target / "docs" / "plan.md"
+        dst.write_text("# Edited by the team\n")
+        copied = install.copy_artifact(
+            self.artifact, self.clank_root, self.target, self._abort
+        )
+        self.assertFalse(copied)
+        self.assertEqual(dst.read_text(), "# Edited by the team\n")
+
+    def test_uninstall_keeps_the_file(self):
+        install.copy_artifact(self.artifact, self.clank_root, self.target, self._abort)
+        install.write_receipt(self.target, ["plan-doc"], "0.0.0", "test")
+        manifest = install.Manifest(
+            artifacts=[self.artifact], presets={}, version=1
+        )
+        install.uninstall(manifest, self.clank_root, self.target, ["plan-doc"])
+        self.assertTrue((self.target / "docs" / "plan.md").exists())
+        self.assertNotIn(
+            "plan-doc", install.read_receipt(self.target).get("artifacts", [])
+        )
+
+    def test_lint_requires_dest(self):
+        manifest = install.Manifest(
+            artifacts=[
+                {
+                    "id": "no-dest",
+                    "type": "scaffold",
+                    "path": "base/templates/plan.md",
+                }
+            ],
+            presets={},
+            version=1,
+        )
+        errors = install.lint_manifest(manifest, self.clank_root)
+        self.assertTrue(any("requires 'dest'" in e for e in errors))
+
+    def test_lint_rejects_escaping_dest(self):
+        for bad_dest in ("../outside.md", "/etc/plan.md"):
+            manifest = install.Manifest(
+                artifacts=[
+                    {
+                        "id": "escaper",
+                        "type": "scaffold",
+                        "path": "base/templates/plan.md",
+                        "dest": bad_dest,
+                    }
+                ],
+                presets={},
+                version=1,
+            )
+            errors = install.lint_manifest(manifest, self.clank_root)
+            self.assertTrue(
+                any("must be relative" in e for e in errors),
+                f"dest {bad_dest!r} should be rejected",
+            )
+
+    def test_symlinked_parent_dir_escape_is_blocked(self):
+        outside = Path(self.tmp.name) / "outside"
+        outside.mkdir()
+        (self.target / "docs").symlink_to(outside)
+        with self.assertRaises(install.InstallError):
+            install.copy_artifact(
+                self.artifact, self.clank_root, self.target, self._abort
+            )
+        self.assertFalse((outside / "plan.md").exists())
+
+    def test_dry_run_reports_skip_when_dest_exists(self):
+        dst = self.target / "docs" / "plan.md"
+        dst.parent.mkdir(parents=True)
+        dst.write_text("# My real plan\n")
+        rc, out, _err = run_install(
+            "--target", str(self.target),
+            "--include", "plan-doc",
+            "--dry-run",
+        )
+        self.assertEqual(rc, 0)
+        self.assertIn("scaffold already exists", out)
+        self.assertNotIn("copy", out.split("plan-doc")[0])
+        self.assertEqual(dst.read_text(), "# My real plan\n")
+
+    def test_real_scaffolds_install_end_to_end(self):
+        rc, out, _err = run_install(
+            "--target", str(self.target),
+            "--include", "plan-doc,changelog-doc",
+            "--force",
+        )
+        self.assertEqual(rc, 0)
+        self.assertIn("plan-doc", out)
+        self.assertTrue((self.target / "docs" / "plan.md").is_file())
+        self.assertTrue((self.target / "CHANGELOG.md").is_file())
+
+
 class TestCursesPicker(unittest.TestCase):
     def setUp(self):
         self.manifest = install.Manifest.load(FIXTURES / "manifest_valid.toml")
