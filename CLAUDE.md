@@ -2,6 +2,12 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Status
+
+Current focus: **none in flight** — the project-docs convention + scaffold
+artifact type shipped 2026-06-12. Read `docs/plan.md` before starting work;
+`CHANGELOG.md` logs what shipped.
+
 ## Purpose
 
 `clank` is a template repository for Claude Code customizations — sub-agents, skills, hooks, and rules — that the user copies or references when starting new projects. It is not an application; there is no build, test, or lint pipeline. The "source code" here is configuration and prompts that shape how Claude Code behaves in downstream projects.
