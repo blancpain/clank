@@ -33,9 +33,11 @@ past; CLAUDE.md holds only durable facts plus the pointer.
   migrate or add a `## Status` section to CLAUDE.md pointing at the actual
   locations — tooling follows the pointer.
 
-## First-time setup in an existing project
+## First-time setup
 
-If `docs/plan.md` or `CHANGELOG.md` is missing (the clank installer
-scaffolds them only for projects that lack them), create them from the
-skeletons and add the `## Status` section to CLAUDE.md as part of the first
-`/handoff` — never overwrite existing content.
+If any piece of the canonical set is missing, complete it during the first
+`/handoff` (or `/pickup`) that touches the project: create `docs/plan.md` /
+`CHANGELOG.md` from the skeletons if absent (the clank installer scaffolds
+them only for projects that lack them), and **add the `## Status` section to
+CLAUDE.md if it doesn't exist yet** — the installer never writes it. Never
+overwrite existing content.

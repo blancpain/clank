@@ -56,7 +56,8 @@ Confirm everything that shipped this session has a terse, dated entry (with
 PR/issue number) at the top of `CHANGELOG.md` — shipped items move OUT of
 the plan and INTO the changelog, in the same handoff. One line per change;
 trivial edits need no entry. Refresh the `## Status` section in `CLAUDE.md`
-if the current focus changed.
+if the current focus changed — and add the section if `CLAUDE.md` doesn't
+have one yet (the installer never writes it; see `rules/project-docs.md`).
 
 ## Step 4: Update persistent memory
 
