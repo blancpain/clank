@@ -78,6 +78,12 @@ def lint_manifest(manifest: Manifest, clank_root: Path) -> list[str]:
         if artifact.get("type") not in VALID_TYPES:
             errors.append(f"{aid}: invalid type {artifact.get('type')!r}")
 
+        gi = artifact.get("gitignore")
+        if gi is not None and (
+            not isinstance(gi, list) or not all(isinstance(x, str) for x in gi)
+        ):
+            errors.append(f"{aid}: gitignore must be a list of strings")
+
         if artifact.get("type") == "external-skill":
             # External skills are fetched at install time via `npx skills add`
             # and live at target/.claude/skills/<skill_name>/ afterwards. They
@@ -278,10 +284,44 @@ def _copy_directory(
         if not src_file.is_file():
             continue
         rel = src_file.relative_to(src_dir)
+        # Never ship Python bytecode cache into a target — a skill that bundles a
+        # .py helper accumulates __pycache__/*.pyc that must not be installed.
+        if "__pycache__" in rel.parts or rel.suffix == ".pyc":
+            continue
         dst_file = dst_dir / rel
         if _copy_file(src_file, dst_file, on_conflict):
             any_copied = True
     return any_copied
+
+
+def _apply_gitignore(
+    target: Path, patterns: list[str], dry_run: bool = False
+) -> bool:
+    """Append .gitignore patterns an artifact declares, if not already present.
+
+    Idempotent: patterns already present (exact line, whitespace-stripped) are
+    skipped. .gitignore is project-owned content — like scaffolds, these entries
+    are appended on install but never removed on uninstall. Returns True if
+    anything was (or, in dry-run, would be) added.
+    """
+    gitignore = target / ".gitignore"
+    existing_lines = gitignore.read_text().splitlines() if gitignore.exists() else []
+    present = {line.strip() for line in existing_lines}
+    missing = [p for p in patterns if p not in present]
+    if not missing:
+        return False
+    if dry_run:
+        print(f"[dry-run] add to .gitignore: {', '.join(missing)}")
+        return True
+    out = list(existing_lines)
+    if out and out[-1].strip():
+        out.append("")
+    header = "# clank-managed"
+    if header not in present:
+        out.append(header)
+    out.extend(missing)
+    gitignore.write_text("\n".join(out) + "\n")
+    return True
 
 
 def _external_skill_dir(artifact: dict, target: Path) -> Path:
@@ -1063,6 +1103,17 @@ def install(
                 frag = json.loads((clank_root / frag_rel).read_text())
                 mcp_current = merge_mcp(mcp_current, frag)
             mcp_path.write_text(json.dumps(mcp_current, indent=2) + "\n")
+
+    # .gitignore patterns declared by installed artifacts (e.g. a skill that
+    # bundles a Python helper wants __pycache__/ ignored). Applies in dry-run
+    # too, as a preview.
+    gi_patterns: list[str] = []
+    for aid in copied_ids:
+        for pat in manifest.artifacts[aid].get("gitignore", []):
+            if pat not in gi_patterns:
+                gi_patterns.append(pat)
+    if gi_patterns:
+        _apply_gitignore(target, gi_patterns, dry_run=dry_run)
 
     if not dry_run and copied_ids:
         write_receipt(target, copied_ids, clank_version, clank_commit)

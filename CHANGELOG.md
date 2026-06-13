@@ -5,6 +5,15 @@ lands; keep entries short — the diff is the detail.
 
 ## 2026-06-13
 
+- **Installer: per-artifact `gitignore` field + pycache exclusion**: artifacts
+  can now declare a `gitignore = [...]` list in `manifest.toml`; the installer
+  appends those patterns to the target's `.gitignore` (create-if-missing,
+  idempotent — patterns already present by exact line are skipped, never
+  duplicated, never removed on uninstall, like scaffolds). `appstore-connect`
+  uses it for `__pycache__/` + `*.pyc`. Separately, `_copy_directory` now drops
+  `__pycache__/` and `*.pyc` so a skill bundling a `.py` helper never ships
+  bytecode cache into a target. Lint validates the field is a list of strings.
+  +7 tests (115 total).
 - **`appstore-connect` skill (swift addon)**: App Store Connect API + TestFlight
   from the CLI. Step 0 preflight verifies a per-machine API key
   (`~/.appstoreconnect/`) and walks the user through creating one if absent (never

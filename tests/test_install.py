@@ -1518,5 +1518,116 @@ class TestCursesPicker(unittest.TestCase):
             self.assertIsNone(install.curses_pick(self.manifest))
 
 
+class TestSkillCopyExcludesPycache(unittest.TestCase):
+    """Copying a skill dir must drop __pycache__/ and *.pyc cruft."""
+
+    def test_pycache_and_pyc_not_copied(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            src = Path(tmp) / "src"
+            (src / "__pycache__").mkdir(parents=True)
+            (src / "__pycache__" / "mod.cpython-311.pyc").write_bytes(b"x")
+            (src / "SKILL.md").write_text("skill")
+            (src / "helper.py").write_text("print(1)")
+            (src / "helper.pyc").write_bytes(b"x")
+            dst = Path(tmp) / "dst"
+            install._copy_directory(src, dst, lambda _d: "overwrite")
+            self.assertTrue((dst / "SKILL.md").exists())
+            self.assertTrue((dst / "helper.py").exists())
+            self.assertFalse((dst / "__pycache__").exists())
+            self.assertFalse((dst / "helper.pyc").exists())
+
+
+class TestApplyGitignore(unittest.TestCase):
+    """_apply_gitignore appends declared patterns, idempotently."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.target = Path(self.tmp.name)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _body(self) -> str:
+        return (self.target / ".gitignore").read_text()
+
+    def test_creates_when_missing(self):
+        changed = install._apply_gitignore(self.target, ["__pycache__/", "*.pyc"])
+        self.assertTrue(changed)
+        self.assertIn("__pycache__/", self._body())
+        self.assertIn("*.pyc", self._body())
+
+    def test_skips_patterns_already_present(self):
+        (self.target / ".gitignore").write_text("build/\n__pycache__/\n")
+        changed = install._apply_gitignore(self.target, ["__pycache__/", "*.pyc"])
+        self.assertTrue(changed)
+        body = self._body()
+        self.assertEqual(body.count("__pycache__/"), 1)  # not duplicated
+        self.assertIn("*.pyc", body)
+        self.assertIn("build/", body)  # untouched
+
+    def test_idempotent_when_all_present(self):
+        (self.target / ".gitignore").write_text("*.pyc\n__pycache__/\n")
+        before = self._body()
+        changed = install._apply_gitignore(self.target, ["__pycache__/", "*.pyc"])
+        self.assertFalse(changed)
+        self.assertEqual(self._body(), before)
+
+    def test_dry_run_writes_nothing(self):
+        install._apply_gitignore(self.target, ["*.pyc"], dry_run=True)
+        self.assertFalse((self.target / ".gitignore").exists())
+
+
+class TestGitignoreManifestField(unittest.TestCase):
+    """The `gitignore` artifact field: lint guard + install-flow wiring."""
+
+    def test_lint_rejects_non_list_gitignore(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "base" / "rules").mkdir(parents=True)
+            (root / "base" / "rules" / "r.md").write_text("x")
+            artifact = {
+                "id": "r",
+                "type": "rule",
+                "path": "base/rules/r.md",
+                "gitignore": "*.pyc",
+            }
+            m = install.Manifest(artifacts=[artifact], presets={}, version=1)
+            errors = install.lint_manifest(m, root)
+            self.assertTrue(any("gitignore must be a list" in e for e in errors))
+
+    def test_install_applies_declared_gitignore(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "clank"
+            (root / "base" / "rules").mkdir(parents=True)
+            (root / "base" / "rules" / "r.md").write_text("rule body\n")
+            (root / "manifest.toml").write_text(
+                "version = 1\n"
+                "[[artifacts]]\n"
+                'id = "r"\n'
+                'type = "rule"\n'
+                'path = "base/rules/r.md"\n'
+                'gitignore = ["__pycache__/", "*.pyc"]\n'
+                "[presets]\n"
+            )
+            target = Path(tmp) / "project"
+            target.mkdir()
+            install.install(
+                manifest_path=root / "manifest.toml",
+                clank_root=root,
+                target=target,
+                preset=None,
+                include=["r"],
+                exclude=[],
+                conflict_policy="overwrite",
+                dry_run=False,
+                review_hook_opt_in=False,
+                clank_version="test",
+                clank_commit="testcommit",
+            )
+            body = (target / ".gitignore").read_text()
+            self.assertIn("__pycache__/", body)
+            self.assertIn("*.pyc", body)
+
+
 if __name__ == "__main__":
     unittest.main()

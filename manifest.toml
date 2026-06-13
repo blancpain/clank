@@ -562,6 +562,7 @@ type = "skill"
 path = "addons/swift/skills/appstore-connect"
 description = "App Store Connect API + TestFlight from the CLI — set up/verify the API key, check build/validation status, fetch Xcode Cloud build logs, manage TestFlight testers, diagnose ITMS delivery rejections"
 tags = ["swift", "release"]
+gitignore = ["__pycache__/", "*.pyc"]
 
 [presets]
 minimal = ["bash-safety", "file-safety", "code-reviewer", "executing-actions-with-care"]
