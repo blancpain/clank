@@ -556,6 +556,13 @@ path = "addons/swift/skills/ios-run"
 description = "Build/install/run iOS+watchOS apps from the CLI — simctl, devicectl, paired watch sims, signing gotchas"
 tags = ["swift", "workflow"]
 
+[[artifacts]]
+id = "appstore-connect"
+type = "skill"
+path = "addons/swift/skills/appstore-connect"
+description = "App Store Connect API + TestFlight from the CLI — set up/verify the API key, check build/validation status, fetch Xcode Cloud build logs, manage TestFlight testers, diagnose ITMS delivery rejections"
+tags = ["swift", "release"]
+
 [presets]
 minimal = ["bash-safety", "file-safety", "code-reviewer", "executing-actions-with-care"]
 base-only = ["@tag:base"]
@@ -565,7 +572,7 @@ sql = ["@preset:base-only", "sql-reviewer", "mcp-postgres-safety", "schema-sync-
 supabase = ["@preset:base-only", "mcp-supabase-safety", "supabase-mcp"]
 go = ["@preset:base-only", "go-reviewer", "golangci-lint", "golang-coding-style", "golang-testing", "golang-security", "golang-patterns"]
 rust = ["@preset:base-only", "rust-reviewer", "cargo-clippy", "rust-coding-style", "rust-testing", "rust-security"]
-swift = ["@preset:base-only", "swift-reviewer", "swift-coding-style", "swiftui-patterns", "swift-testing", "ios-run"]
+swift = ["@preset:base-only", "swift-reviewer", "swift-coding-style", "swiftui-patterns", "swift-testing", "ios-run", "appstore-connect"]
 python-sql = ["@preset:python", "@preset:sql"]
 typescript-sql = ["@preset:typescript", "@preset:sql"]
 fullstack-python = ["@preset:python", "@preset:typescript", "@preset:sql"]

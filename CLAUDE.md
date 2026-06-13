@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Status
 
-Current focus: **none in flight** — the project-docs convention + scaffold
-artifact type shipped 2026-06-12. Read `docs/plan.md` before starting work;
-`CHANGELOG.md` logs what shipped.
+Current focus: **none in flight** — `appstore-connect` skill (swift addon)
+shipped 2026-06-13. Read `docs/plan.md` before starting work; `CHANGELOG.md`
+logs what shipped.
 
 ## Purpose
 
