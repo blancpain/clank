@@ -3,6 +3,15 @@
 Dated log of what shipped. Newest first. Append an entry when a feature
 lands; keep entries short — the diff is the detail.
 
+## 2026-06-14
+
+- **Project-docs convention: ban time/effort estimates in plans**: added a rule
+  to `base/rules/project-docs.md` and a note to `base/templates/plan.md`
+  prohibiting duration/effort sizing on plan items (`~2 wks`, story points) —
+  meaningless under agent execution and stale on contact; order by priority and
+  dependency instead. Real external dates (expiries, ramp/cleanup, deadlines)
+  are explicitly kept, since `/pickup` checks them as time bombs.
+
 ## 2026-06-13
 
 - **Installer: per-artifact `gitignore` field + pycache exclusion**: artifacts

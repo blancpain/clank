@@ -24,6 +24,12 @@ past; CLAUDE.md holds only durable facts plus the pointer.
 - **Plan entries must pass the fresh-agent test**: a new session should be
   able to start any queued item from its bullet alone — name the entry-point
   files, IDs, URLs, and constraints discovered so far.
+- **No time or effort estimates.** Don't size plan items by duration or effort
+  (`~2 wks`, `3–4 days`, `½ day`, story points) — agent execution makes them
+  meaningless and they go stale on contact. Order by priority and dependency
+  instead (what's next, what it's blocked on). This bans *estimates*, not real
+  calendar facts: keep concrete external dates — expiries, ramp/cleanup dates,
+  deadlines — which `/pickup` checks as time bombs.
 - **Changelog entries record the why**, not the diff: the key decision, the
   verification status, anything a future reader can't reconstruct from code.
 - **Don't fork the convention.** No parallel TODO.md / NOTES.md / plan-v2;
