@@ -1,6 +1,6 @@
 ---
 name: appstore-connect
-description: "App Store Connect API + TestFlight from the CLI — set up & verify the API key, check build/processing status, fetch Xcode Cloud build logs, manage TestFlight groups/testers, and diagnose delivery rejections (ITMS errors). Invoke via /appstore-connect, or when asked about TestFlight, whether a build passed validation / its processing state, Xcode Cloud build logs, App Store Connect data, or why an upload was rejected."
+description: "App Store Connect API + TestFlight + Xcode Cloud from the CLI — set up/verify the API key, check build & processing status, fetch and read Xcode Cloud build logs, trigger or re-run builds, manage TestFlight groups/testers, and diagnose failures (Xcode Cloud archive/export/signing/provisioning errors AND delivery-validation ITMS rejections). Invoke via /appstore-connect, and proactively whenever an Xcode Cloud build FAILED or went red, when asked to investigate why a build failed / what broke CI / why an archive, export, signing, or upload failed, whether a build passed validation or its processing state, signing or provisioning-profile errors, TestFlight delivery/testers, or any App Store Connect or Xcode Cloud build data."
 ---
 
 # appstore-connect — App Store Connect API + TestFlight from the CLI
@@ -90,6 +90,31 @@ python3 ~/.appstoreconnect/asc.py "/v1/ciBuildActions/<ACTION_ID>/artifacts"    
 ```
 
 Build logs are artifacts — read an artifact's `downloadUrl` then `curl -L` it.
+
+**Diagnose a *failed* build run.** The `issues` endpoint often only says
+"Exporting … failed. Please download the logs artifact" — the real cause is
+inside the `LOG_BUNDLE` artifact, in the `*.xcdistributionlogs/IDEDistribution*.log`
+files. Download + unzip it (into a fresh `mktemp -d` dir — the safety hook blocks
+`rm`) and grep for `error:`, `provisioning`, `entitlement`, `No profiles`,
+`Automatic signing`. A common archive/**export** failure after entitlements are
+added: an entitlement whose capability isn't enabled on the **App ID** —
+`"Automatic signing cannot update … to enable <Capability>"` + `"No profiles for
+'<bundle id>' were found"`. Cloud-managed signing **cannot** add a capability to
+a pre-registered App ID; enable it in the portal (developer.apple.com →
+Identifiers → the App ID → tick the capability → Save), then re-run (below).
+
+**Trigger / re-run a build** (mutation — **confirm with the user first**). Useful
+after fixing signing/capabilities. Get the workflow, then POST a run; it builds
+the workflow's configured branch:
+
+```sh
+python3 ~/.appstoreconnect/asc.py "/v1/ciProducts/<PRODUCT_ID>/workflows?fields%5BciWorkflows%5D=name,isEnabled"  # -> WORKFLOW_ID
+echo '{"data":{"type":"ciBuildRuns","relationships":{"workflow":{"data":{"type":"ciWorkflows","id":"<WORKFLOW_ID>"}}}}}' \
+  | python3 ~/.appstoreconnect/asc.py POST "/v1/ciBuildRuns"   # poll the new run's number + executionProgress
+```
+
+(Writes need a current `asc.py` — older copies mishandle `POST`; Step 0's
+`cp -f` refresh is not optional.)
 
 ## 3. TestFlight — get a build onto a tester's device
 

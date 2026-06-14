@@ -5,6 +5,19 @@ lands; keep entries short — the diff is the detail.
 
 ## 2026-06-14
 
+- **`appstore-connect` skill: fire on build-failure investigations + re-trigger recipe**:
+  rewrote the skill `description` so it surfaces proactively when an Xcode Cloud
+  build *fails* / "investigate why a build failed" / archive/export/signing/
+  provisioning errors — previously it only advertised delivery (ITMS) rejections,
+  so a "builds N failed, investigate why" prompt didn't match. Added a §2 recipe
+  for reading export-failure causes out of the `LOG_BUNDLE` `IDEDistribution*.log`
+  (e.g. an entitlement whose capability isn't enabled on the App ID) and for
+  triggering/re-running a build via `POST /v1/ciBuildRuns`.
+- **`branch-per-feature` rule: standalone prose docs skip the branch + PR**: added
+  an exception so doc-only edits (`README`, `CHANGELOG`, `docs/`, `plan.md`,
+  `CLAUDE.md`) commit straight to `main` — no branch, no PR. Behavioral config
+  (`.claude/rules/*`, skills, hooks, agents) and code, plus docs that accompany a
+  code change, keep the branch/PR flow.
 - **Project-docs convention: ban time/effort estimates in plans**: added a rule
   to `base/rules/project-docs.md` and a note to `base/templates/plan.md`
   prohibiting duration/effort sizing on plan items (`~2 wks`, story points) —

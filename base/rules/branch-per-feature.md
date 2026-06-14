@@ -4,6 +4,8 @@
 
 Every new feature, bugfix, or non-trivial change must be developed on a dedicated branch and land in `main` (or the project's integration branch) via a pull request — never by direct commit or push to the shared branch.
 
+**Exception — standalone prose docs.** Edits that touch *only* prose documentation (`README`, `CHANGELOG.md`, `docs/`, `docs/plan.md`, `CLAUDE.md`) may be committed straight to `main` — no branch, no PR. This is the common case for plan/changelog/status upkeep, and the PR ceremony adds nothing. It applies **only** when the change is documentation-and-nothing-else: docs that accompany a code change ride in that change's branch/PR, and behavioral config (`.claude/rules/*`, skills, hooks, agents) and code are **not** prose docs — they keep the branch/PR flow.
+
 ## When to create a branch
 
 **Before making any code changes**, check the current branch:
@@ -35,6 +37,7 @@ Direct commits to the current branch are acceptable only when:
 - The user has explicitly said "commit to this branch" or "stay on main"
 - The current branch is already a feature branch (not a shared branch)
 - The change is a trivial one-line fix the user has explicitly asked to land on `main`
+- The change is **standalone prose documentation** (README, CHANGELOG, `docs/`, `plan.md`, `CLAUDE.md` — see the exception under "## Rule") — commit straight to `main`, no branch needed
 
 When in doubt, ask before committing to a shared branch.
 
@@ -54,4 +57,4 @@ Once the work on the feature branch is ready, the change ships by opening a pull
 
 ### Exceptions to the PR requirement
 
-Skip the PR only when the user **proactively, unprompted** says so ("just commit and push", "no PR needed", "land it directly") — a choice the user makes from options *you* put in front of them does **not** count — or when the project's documented workflow genuinely doesn't use PRs (e.g. a solo scratch repo). When in doubt, ask.
+Skip the PR when the change is **standalone prose documentation** (README, CHANGELOG, `docs/`, `plan.md`, `CLAUDE.md` — see the exception under "## Rule"); it needs neither a branch nor a PR. Otherwise skip the PR only when the user **proactively, unprompted** says so ("just commit and push", "no PR needed", "land it directly") — a choice the user makes from options *you* put in front of them does **not** count — or when the project's documented workflow genuinely doesn't use PRs (e.g. a solo scratch repo). When in doubt, ask.
