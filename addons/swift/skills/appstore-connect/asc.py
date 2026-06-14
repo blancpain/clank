@@ -22,12 +22,36 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-ISSUER = os.environ["ASC_ISSUER_ID"]
-KEY_ID = os.environ["ASC_KEY_ID"]
+SETUP_HELP = (
+    "App Store Connect API access isn't configured on this machine.\n"
+    "  1. App Store Connect > Users and Access > Integrations > App Store Connect\n"
+    "     API > Team Keys > Generate API Key (role: App Manager). Note the Issuer\n"
+    "     ID + Key ID; download AuthKey_<KEYID>.p8 (downloadable only once).\n"
+    "  2. mkdir -p ~/.appstoreconnect/private_keys && chmod 700 ~/.appstoreconnect\n"
+    "     mv ~/Downloads/AuthKey_<KEYID>.p8 ~/.appstoreconnect/private_keys/\n"
+    "     chmod 600 ~/.appstoreconnect/private_keys/AuthKey_<KEYID>.p8\n"
+    "  3. printf 'ASC_ISSUER_ID=%s\\nASC_KEY_ID=%s\\n' <ISSUER> <KEYID> "
+    "> ~/.appstoreconnect/config.env\n"
+    "  4. source it: set -a; . ~/.appstoreconnect/config.env; set +a\n"
+    "(See the appstore-connect skill, Step 0.)"
+)
+
+
+def _require_env(name: str) -> str:
+    value = os.environ.get(name)
+    if not value:
+        sys.exit(f"asc.py: {name} is not set.\n\n{SETUP_HELP}")
+    return value
+
+
+ISSUER = _require_env("ASC_ISSUER_ID")
+KEY_ID = _require_env("ASC_KEY_ID")
 KEY_PATH = os.environ.get(
     "ASC_KEY_PATH",
     os.path.expanduser(f"~/.appstoreconnect/private_keys/AuthKey_{KEY_ID}.p8"),
 )
+if not os.path.isfile(KEY_PATH):
+    sys.exit(f"asc.py: private key not found at {KEY_PATH}.\n\n{SETUP_HELP}")
 BASE = "https://api.appstoreconnect.apple.com"
 WRITE_METHODS = {"POST", "PATCH", "PUT"}
 

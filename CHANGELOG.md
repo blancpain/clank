@@ -5,6 +5,11 @@ lands; keep entries short — the diff is the detail.
 
 ## 2026-06-14
 
+- **`appstore-connect` `asc.py`: preflight on missing credentials**: the helper
+  now checks `ASC_ISSUER_ID` / `ASC_KEY_ID` and the `.p8` up front and exits with
+  actionable setup guidance instead of a bare `KeyError`/openssl traceback. The
+  friendly "create a key" path no longer depends on the agent running the skill's
+  Step 0 — the tool self-explains on any machine where access isn't configured.
 - **`appstore-connect` skill: fire on build-failure investigations + re-trigger recipe**:
   rewrote the skill `description` so it surfaces proactively when an Xcode Cloud
   build *fails* / "investigate why a build failed" / archive/export/signing/
