@@ -3,6 +3,21 @@
 Dated log of what shipped. Newest first. Append an entry when a feature
 lands; keep entries short — the diff is the detail.
 
+## 2026-06-15
+
+- **`ios-app-store-setup` skill (swift addon)**: first-time bootstrap runbook for
+  shipping a new iOS app to App Store / TestFlight via Xcode Cloud — App ID +
+  capabilities (capabilities-before-signing is the #1 gotcha), app record, cloud
+  signing, the workflow + TestFlight Internal post-action from day one, the
+  Internal tester group, and the first-build ITMS fixes (90022/90023 icon, 90713
+  `CFBundleIconName`, export compliance, www-not-apex AASA). Added to the `swift`
+  preset; complements `appstore-connect` (ongoing API ops) and `ios-run` (local).
+- **`appstore-connect` skill: build→group assignment + delivery states**: added
+  the recipe to assign a `VALID` build to an internal group
+  (`POST /v1/betaGroups/{id}/relationships/builds`), the `READY_FOR_BETA_TESTING`
+  → `IN_BETA_TESTING` semantics, and the `hasAccessToAllBuilds`-is-misleading
+  gotcha (builds stay explicitly linked).
+
 ## 2026-06-14
 
 - **`appstore-connect` `asc.py`: preflight on missing credentials**: the helper
