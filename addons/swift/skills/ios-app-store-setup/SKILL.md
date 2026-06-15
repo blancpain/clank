@@ -20,6 +20,16 @@ on the App ID before the first signed build, or the archive export fails.
 - Decide the **bundle ID** (reverse-DNS, e.g. `com.acme.app`) — it's permanent.
 - Decide signing: **Xcode Cloud cloud-managed automatic signing** is simplest
   (no manual certs/profiles); this runbook assumes it.
+- **Assess before you create.** This skill may run against a *partly* set-up app,
+  so check current state via the API before doing anything in a portal. Run the
+  `appstore-connect` skill's **Step 0 preflight** first — the API key lives at
+  `~/.appstoreconnect/` (use that exact path, don't guess) and often already
+  exists. With it, query what's already there: `/v1/apps?filter[bundleId]=<id>`
+  (does the app record exist? note its numeric `adamId`) and
+  `/v1/bundleIds?filter[identifier]=<id>&include=bundleIdCapabilities` (which App
+  ID capabilities are already enabled — automatic signing for *local device*
+  builds may have added them already, so step 1 is often already done). Verify,
+  don't duplicate.
 
 ## 1. Register the App ID + capabilities  ⚠️ do this FIRST
 
@@ -71,6 +81,36 @@ App Store Connect → the app → **Xcode Cloud** → **Manage Workflows** → �
 
 Cloud-managed signing is automatic once the workflow archives — no certs to
 upload.
+
+> **Generated projects (XcodeGen / Tuist) + gitignored config.** If the
+> `.xcodeproj`/`.xcworkspace` is **generated and gitignored**, two things break
+> that a normal committed-project setup doesn't hit:
+>
+> 1. **Onboarding can't find the project.** Xcode Cloud's web onboarding scans
+>    the cloned repo for a project/scheme and finds none. **Set the workflow up
+>    from Xcode** (Product → Xcode Cloud → Create Workflow) — it reads the *open
+>    local* project and references the scheme by name — *or* un-gitignore and
+>    commit the generated project (simplest, at the cost of regen churn).
+> 2. **The CI runner clones a repo with no project** (and no gitignored config/
+>    secret files). Add **`ci_scripts/ci_post_clone.sh`** — Xcode Cloud runs it
+>    automatically after cloning, before the build — to regenerate the project
+>    *and* recreate those files from workflow **environment variables**:
+>
+>    ```sh
+>    #!/bin/sh
+>    set -eu
+>    cd "${CI_PRIMARY_REPOSITORY_PATH:-$(dirname "$0")/..}"
+>    # 1. recreate gitignored config/secrets from (secret) workflow env vars —
+>    #    e.g. an xcconfig built from an API URL/key the repo never commits.
+>    # 2. regenerate the project
+>    command -v xcodegen >/dev/null 2>&1 || brew install xcodegen
+>    xcodegen generate            # Tuist: tuist generate
+>    ```
+>
+> Set those secret values as **(secret) environment variables on the workflow**.
+> The shared scheme (step 3) must be one the *regenerated* project emits — with
+> XcodeGen, declare it explicitly under `schemes:` (auto-generated schemes land
+> in `xcuserdata`, which is gitignored and invisible to CI).
 
 ## 5. Internal tester group
 

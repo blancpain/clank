@@ -5,6 +5,14 @@ lands; keep entries short — the diff is the detail.
 
 ## 2026-06-15
 
+- **`ios-app-store-setup` skill: assess-first + generated-project guidance**:
+  added a Step 0 "assess before you create" pointer (run the `appstore-connect`
+  preflight, query the existing app record + App ID capabilities before any
+  portal action — verify, don't duplicate) and a Step 4 callout for generated
+  projects (XcodeGen/Tuist) with a gitignored `.xcodeproj`: onboard Xcode Cloud
+  from Xcode (the web UI can't see the project) plus a `ci_post_clone.sh` that
+  regenerates the project and recreates gitignored secret config from workflow
+  env vars. Both prompted by gaps hit during a real first-time TestFlight setup.
 - **installer: MCP merge skips the default server when named variants exist**:
   `merge_mcp` no longer re-adds a fragment's default server (e.g. `postgres`)
   when the target already configured named variants of it (`postgres-dev`,
