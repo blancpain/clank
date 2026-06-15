@@ -564,6 +564,13 @@ description = "App Store Connect API + TestFlight from the CLI — set up/verify
 tags = ["swift", "release"]
 gitignore = ["__pycache__/", "*.pyc"]
 
+[[artifacts]]
+id = "ios-app-store-setup"
+type = "skill"
+path = "addons/swift/skills/ios-app-store-setup"
+description = "First-time iOS App Store / TestFlight bootstrap via Xcode Cloud — App ID + capabilities, app record, cloud signing, the workflow + TestFlight post-action, Internal group, and the first-build ITMS gotchas"
+tags = ["swift", "release"]
+
 [presets]
 minimal = ["bash-safety", "file-safety", "code-reviewer", "executing-actions-with-care"]
 base-only = ["@tag:base"]
@@ -573,7 +580,7 @@ sql = ["@preset:base-only", "sql-reviewer", "mcp-postgres-safety", "schema-sync-
 supabase = ["@preset:base-only", "mcp-supabase-safety", "supabase-mcp"]
 go = ["@preset:base-only", "go-reviewer", "golangci-lint", "golang-coding-style", "golang-testing", "golang-security", "golang-patterns"]
 rust = ["@preset:base-only", "rust-reviewer", "cargo-clippy", "rust-coding-style", "rust-testing", "rust-security"]
-swift = ["@preset:base-only", "swift-reviewer", "swift-coding-style", "swiftui-patterns", "swift-testing", "ios-run", "appstore-connect"]
+swift = ["@preset:base-only", "swift-reviewer", "swift-coding-style", "swiftui-patterns", "swift-testing", "ios-run", "appstore-connect", "ios-app-store-setup"]
 python-sql = ["@preset:python", "@preset:sql"]
 typescript-sql = ["@preset:typescript", "@preset:sql"]
 fullstack-python = ["@preset:python", "@preset:typescript", "@preset:sql"]

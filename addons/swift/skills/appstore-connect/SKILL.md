@@ -136,9 +136,30 @@ echo '{"data":{"type":"betaTesters","attributes":{"email":"<user@email>","firstN
   | python3 ~/.appstoreconnect/asc.py POST "/v1/betaTesters"
 ```
 
+**Assign a build to an internal group** so it actually reaches testers. A
+`VALID` build sits at `internalBuildState: READY_FOR_BETA_TESTING` until it's
+linked to a group; linking flips it to `IN_BETA_TESTING` and (if the build's
+`autoNotifyEnabled`) notifies the group. Confirm with the user — it notifies
+testers:
+
+```sh
+# build id: /v1/builds?filter[app]=<APP_ID>&filter[version]=<N>  ·  group id: the betaGroups query above
+echo '{"data":[{"type":"builds","id":"<BUILD_ID>"}]}' \
+  | python3 ~/.appstoreconnect/asc.py POST "/v1/betaGroups/<GID>/relationships/builds"   # HTTP 204 = done
+python3 ~/.appstoreconnect/asc.py "/v1/builds/<BUILD_ID>/buildBetaDetail?fields%5BbuildBetaDetails%5D=internalBuildState"  # expect IN_BETA_TESTING
+```
+
+**Gotcha:** `hasAccessToAllBuilds: true` on a group is misleading — builds are
+still linked explicitly (the group's `/builds` lists only what was added), so a
+new build needs the assignment above even when that flag reads true. To automate
+it, add the Xcode Cloud **TestFlight Internal Testing post-action** once (Manage
+Workflows → the workflow → Post-Actions ⊕) and every future build auto-delivers.
+
 For a one-off internal setup, the App Store Connect UI (TestFlight → Internal
 Testing) is usually faster than scripting — prefer guiding the user there, and
-use the API for status, automation, and CI flows.
+use the API for status, automation, and CI flows. First-time bootstrap of a new
+app (App ID, capabilities, workflow, first build) → see the `ios-app-store-setup`
+skill.
 
 ## 4. Build rejected at validation? Common ITMS fixes
 
