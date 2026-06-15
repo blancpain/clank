@@ -506,13 +506,24 @@ def merge_mcp(target: dict, fragment: dict) -> dict:
 
     Adds ``mcpServers`` entries from the fragment. Target entries win on
     key conflict — if the user already configured a server with the same
-    name, we leave it alone. Idempotent.
+    name, we leave it alone.
+
+    A fragment server is also skipped when the target already has named
+    variants of it — e.g. the fragment ships ``postgres`` but the project
+    configured ``postgres-dev`` / ``postgres-mini`` for a multi-DB setup.
+    Those variants mean the default server was deliberately replaced, so
+    re-adding it on every reinstall would only resurrect a dead entry
+    (the default reads ``DB_URL``, which such a project usually doesn't
+    define). A target server named ``<fragment-name>-<suffix>`` counts as
+    such a variant. Idempotent.
     """
     result = copy.deepcopy(target)
     for server_name, server_config in (fragment.get("mcpServers") or {}).items():
-        result.setdefault("mcpServers", {}).setdefault(
-            server_name, copy.deepcopy(server_config)
-        )
+        existing = result.get("mcpServers") or {}
+        prefix = server_name + "-"
+        if any(name == server_name or name.startswith(prefix) for name in existing):
+            continue
+        result.setdefault("mcpServers", {})[server_name] = copy.deepcopy(server_config)
     return result
 
 

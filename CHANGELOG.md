@@ -5,6 +5,13 @@ lands; keep entries short — the diff is the detail.
 
 ## 2026-06-15
 
+- **installer: MCP merge skips the default server when named variants exist**:
+  `merge_mcp` no longer re-adds a fragment's default server (e.g. `postgres`)
+  when the target already configured named variants of it (`postgres-dev`,
+  `postgres-mini`). Previously a multi-DB project got the dead default
+  `postgres` (reads `DB_URL`, which it doesn't define) re-added on every
+  reinstall. A target server named `<fragment-name>-<suffix>` now counts as a
+  variant and suppresses the default. Tests added.
 - **`ios-app-store-setup` skill (swift addon)**: first-time bootstrap runbook for
   shipping a new iOS app to App Store / TestFlight via Xcode Cloud — App ID +
   capabilities (capabilities-before-signing is the #1 gotcha), app record, cloud

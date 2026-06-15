@@ -612,6 +612,42 @@ class TestMcpMerge(unittest.TestCase):
         result2 = install.merge_mcp(result, fragment)
         self.assertEqual(result, result2)
 
+    def test_merge_skips_default_when_named_variant_exists(self):
+        # A multi-DB project configured named variants of the fragment's
+        # default server; the default must not be re-added on reinstall.
+        target = {
+            "mcpServers": {
+                "postgres-dev": {"command": "bash", "args": [".claude/mcp/pg.sh", "DB_URL_DEV"]},
+                "postgres-mini": {"command": "bash", "args": [".claude/mcp/pg.sh", "DB_URL_MINI"]},
+            }
+        }
+        fragment = {
+            "mcpServers": {
+                "postgres": {"command": "bash", "args": [".claude/mcp/pg.sh"]}
+            }
+        }
+        result = install.merge_mcp(target, fragment)
+        self.assertNotIn("postgres", result["mcpServers"])
+        self.assertIn("postgres-dev", result["mcpServers"])
+        self.assertIn("postgres-mini", result["mcpServers"])
+
+    def test_merge_named_variant_skip_does_not_match_unrelated_server(self):
+        # A server that merely shares a substring (not the "<name>-" prefix)
+        # must not suppress the fragment's default server.
+        target = {
+            "mcpServers": {
+                "postgresql_legacy": {"command": "npx", "args": ["other"]}
+            }
+        }
+        fragment = {
+            "mcpServers": {
+                "postgres": {"command": "bash", "args": [".claude/mcp/pg.sh"]}
+            }
+        }
+        result = install.merge_mcp(target, fragment)
+        self.assertIn("postgres", result["mcpServers"])
+        self.assertIn("postgresql_legacy", result["mcpServers"])
+
 
 class TestReceipt(unittest.TestCase):
     def test_write_and_read_receipt(self):
