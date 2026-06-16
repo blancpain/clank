@@ -81,11 +81,31 @@ These prevent the standard first-build rejections (set them before build 1):
 App Store Connect → the app → **Xcode Cloud** → **Manage Workflows** → ＋
 (or set up from within Xcode — same workflow, editable from both surfaces):
 
-- **Start Condition:** Branch Changes on your release branch (e.g. `main`). With
-  **Auto-cancel** on (default), *every* push to that branch — including docs —
-  cancels the in-flight build and starts a new one. Add a **Files and Folders**
-  condition, or use a tag/manual trigger, if routine commits shouldn't kick off
-  (and cancel) builds.
+- **Start Condition — prefer a *tag* trigger over branch-on-`main` for a new app.**
+  Branch Changes on `main` is Xcode's default, but with **Auto-cancel** on (also
+  default) *every* push — including docs/plan upkeep that lands straight on `main` —
+  starts a build *and* cancels the in-flight one, burning Xcode Cloud minutes on
+  commits that ship nothing. A **tag** condition makes builds deliberate and
+  versioned: `git tag v0.2.0 && git push --tags` ships a build; routine `main`
+  pushes stay free. **Cut a tag only when you have a build worth putting on a
+  device** — a merged feature or a fix to verify on-device, a TestFlight beta drop,
+  or an App Store release — *not* on every commit; routine work and docs accumulate
+  on `main` for free until you decide to ship one. (Files-and-Folders exclusions on a branch condition also work,
+  but a tag trigger is simpler and leaves a build↔version trail for the run-up to
+  launch.) Use tag patterns with **prefix `v`** so every `vX.Y.Z` builds, and
+  `autoCancel: false` so a follow-up release tag doesn't kill an in-flight build.
+  Flip an existing branch workflow to tags **via the API** — no portal needed. Get
+  the workflow id from `GET /v1/ciProducts/<productId>/workflows`, then PATCH it,
+  nulling the branch condition and setting the tag one:
+
+    ```sh
+    cat <<'JSON' | python3 ~/.appstoreconnect/asc.py PATCH /v1/ciWorkflows/<id>
+    {"data":{"type":"ciWorkflows","id":"<id>","attributes":{
+      "branchStartCondition":null,
+      "tagStartCondition":{"source":{"isAllMatch":false,
+        "patterns":[{"pattern":"v","isPrefix":true}]},"autoCancel":false}}}}
+    JSON
+    ```
 - **Archive** action (iOS), **Deployment Preparation = TestFlight and App Store**.
 - **Post-Actions → ＋ → TestFlight Internal Testing → the Internal group**
   (step 5). **Add this on day one** — without it, a `VALID` build sits at
