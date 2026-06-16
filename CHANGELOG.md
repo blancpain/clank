@@ -5,6 +5,13 @@ lands; keep entries short — the diff is the detail.
 
 ## 2026-06-16
 
+- **Installer guard: no orphan rule/agent/hook files** — `test_install.py` gained
+  `test_every_rule_agent_hook_file_on_disk_is_registered`, the file-based
+  analogue of the existing skill-dir orphan check. It fails CI if a rule/agent/
+  hook file under `base/`/`addons/` isn't in `manifest.toml` — closing the gap
+  that let `verify-on-simulator.md` ship unregistered (the installer reads the
+  manifest, not the filesystem). 118 tests pass. CLAUDE.md rule #9 updated.
+
 - **Swift addon: sim-verify-before-release convention** — distilled from a Sisu
   UI-polish session where a cloud build was nearly spent on an unverified
   redesign. New `addons/swift/rules/verify-on-simulator.md` (always-loaded in

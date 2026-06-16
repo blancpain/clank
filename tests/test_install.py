@@ -132,6 +132,34 @@ class TestRealManifest(unittest.TestCase):
         }
         self.assertEqual(on_disk - registered, set())
 
+    def test_every_rule_agent_hook_file_on_disk_is_registered(self):
+        """File-based artifacts (rules/agents/hooks) must each be registered in
+        the manifest, so a new one can't be silently dropped at install time —
+        the installer reads the manifest, not the filesystem (CLAUDE.md rule #4).
+        The skill test above is the directory-level analogue; this is the gap it
+        left for single-file artifacts. `.gitkeep` placeholders are ignored, and
+        hook settings fragments count via `settings_fragment`/`mcp_fragment`.
+        """
+        registered = set()
+        for artifact in self.manifest.artifacts.values():
+            for key in ("path", "settings_fragment", "mcp_fragment"):
+                value = artifact.get(key)
+                if value:
+                    registered.add(str(Path(value)))
+        on_disk = {
+            str(p.relative_to(CLANK_ROOT))
+            for d in ("base", "addons")
+            for p in (CLANK_ROOT / d).rglob("*")
+            if p.is_file()
+            and p.parent.name in ("rules", "agents", "hooks")
+            and p.name != ".gitkeep"
+        }
+        self.assertEqual(
+            on_disk - registered,
+            set(),
+            "rule/agent/hook files present on disk but missing from manifest.toml",
+        )
+
     def test_every_skill_has_skill_md(self):
         for aid, artifact in self._skill_artifacts().items():
             skill_md = CLANK_ROOT / artifact["path"] / "SKILL.md"
