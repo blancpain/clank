@@ -5,6 +5,20 @@ lands; keep entries short — the diff is the detail.
 
 ## 2026-06-16
 
+- **Swift addon: sim-verify-before-release convention** — distilled from a Sisu
+  UI-polish session where a cloud build was nearly spent on an unverified
+  redesign. New `addons/swift/rules/verify-on-simulator.md` (always-loaded in
+  Swift projects): a UI-affecting change must be verified by *running the app on
+  a simulator and reading a screenshot* — not compile-success — before cutting a
+  release/distribution build (the ~20-min cloud round-trip is too slow to use as
+  a UI feedback loop). The **`ios-run` skill** gained the matching recipe (§2a):
+  build to the sim, land on the changed screen via a `#if DEBUG` launch arg
+  (seed demo data + deep-link, not UI scripting), screenshot, iterate. Rule =
+  the *when/why* (enforced, scoped to Swift projects so non-iOS repos get no
+  noise); skill = the *how*; project-specific args/sim/bundle id stay in the
+  project's CLAUDE.md (the skill is overwritten on reinstall). Installer
+  auto-discovers the new rule via `rglob` — no install.py change.
+
 - **`ios-app-store-setup` skill: hardened from a real first ship** (hours of
   going in circles bringing a new XcodeGen + Xcode Cloud app to TestFlight,
   distilled): (1) lead with **commit the generated `.xcodeproj` + `Package.resolved`**

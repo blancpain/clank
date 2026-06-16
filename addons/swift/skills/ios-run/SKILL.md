@@ -44,6 +44,49 @@ sleep 3 && xcrun simctl io <UDID> screenshot /tmp/app.png   # verify visually �
 - **Verify by screenshot**, not by exit code: a successful launch can still render a blank/crashed view.
 - For automated flows that need app state (e.g. "start a workout"), prefer adding a debug launch argument the app checks (`CommandLine.arguments.contains("--autostart-x")`) over UI scripting.
 
+## 2a. Verify a UI change on the simulator before shipping a release build
+
+A local simulator build is ~1–2 min; a cloud build + TestFlight round-trip is
+~20 min — far too slow to use as a UI feedback loop, and it burns build quota.
+**Before cutting a release/distribution build (a `v*` tag, Xcode Cloud,
+TestFlight, App Store), build to the sim, launch onto the changed screen,
+screenshot, read it, and iterate locally — only release once it looks right.**
+This is enforced by the `verify-on-simulator` rule; this section is the recipe.
+
+The reliable way to land on a specific screen with the right state is a **DEBUG
+launch argument the app checks** — not UI scripting (coordinate taps are
+fragile). Define the args under `#if DEBUG` so they never ship: a *seed* hook so
+data-driven screens populate, and/or a *deep-link* hook that selects the
+tab/route:
+
+```swift
+// In the root view's .task (or App init), gated #if DEBUG:
+if CommandLine.arguments.contains("--seed-demo-data") { await model.seedDemoDataIfEmpty() }
+if CommandLine.arguments.contains("--screen-x") { /* select that tab / route */ }
+```
+
+```sh
+UDID=$(xcrun simctl list devices | grep "<sim name>" | grep -oE '[0-9A-F-]{36}' | head -1)
+xcrun simctl boot "$UDID" 2>/dev/null; open -a Simulator
+xcodebuild -scheme <Scheme> -destination "id=$UDID" build 2>&1 | grep -E "error:|BUILD"
+APP=$(ls -dt ~/Library/Developer/Xcode/DerivedData/<Scheme>-*/Build/Products/Debug-iphonesimulator/<App>.app | head -1)
+xcrun simctl install "$UDID" "$APP"
+xcrun simctl terminate "$UDID" <bundle-id> 2>/dev/null
+xcrun simctl launch "$UDID" <bundle-id> --seed-demo-data --screen-x
+sleep 4 && xcrun simctl io "$UDID" screenshot /tmp/verify.png   # then Read the PNG
+```
+
+- **Seed-hook safety**: if writes enqueue cloud-sync / pending changes, guard the
+  seed to run only when signed out *and* local data is empty, so demo rows never
+  upload; run the writes off the main thread.
+- `sleep` a few seconds before screenshotting data-dependent screens (async
+  loads/recomputes must settle).
+- Keep the project's specific args, sim name, and bundle id in the **project's
+  CLAUDE.md** — they can't live in this skill, which is installed from clank and
+  overwritten on reinstall.
+- **Watch UI can't be trusted on the simulator** (WatchConnectivity is flaky
+  there) — watch-facing changes still need an on-device build.
+
 ## 3. Paired iPhone + Apple Watch simulators
 
 ```sh
