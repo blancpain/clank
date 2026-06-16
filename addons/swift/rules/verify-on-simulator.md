@@ -21,9 +21,15 @@ avoided this way.)
 2. Launch directly onto the changed screen with a `#if DEBUG` launch argument
    the app checks (seed demo data + deep-link to the screen) — **not** UI
    coordinate scripting, which is fragile.
-3. Screenshot (`xcrun simctl io <UDID> screenshot`) and **read the image**.
-   Iterate locally until it looks right.
-4. Only then cut the release build / push the tag.
+3. Screenshot (`xcrun simctl io <UDID> screenshot`) and **read the image**. Fix
+   anything broken, blank, overflowing, or off, and re-screenshot.
+4. **Show the user the screenshot and get their sign-off before cutting the
+   release build / pushing the tag.** Both verify, with different jobs: the
+   agent confirms it *renders* (objective — not crashed/empty/clipped), but UI
+   *quality* ("does this look good?") is the **user's** call. This convention
+   exists *because* an agent's solo "looks fine" once shipped a screen the user
+   had to send back — surfacing the screenshot closes that loop, doubly so when
+   you're iterating on the user's own feedback.
 
 The full recipe and the DEBUG-launch-argument pattern live in the **`ios-run`
 skill** (§ "Verify a UI change on the simulator"). The project's specific launch

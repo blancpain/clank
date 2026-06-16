@@ -76,6 +76,10 @@ xcrun simctl launch "$UDID" <bundle-id> --seed-demo-data --screen-x
 sleep 4 && xcrun simctl io "$UDID" screenshot /tmp/verify.png   # then Read the PNG
 ```
 
+- **Get the user's sign-off**: reading the PNG yourself catches *broken* (blank,
+  crashed, clipped); for *looks good*, surface the screenshot to the user and get
+  their OK before cutting the release tag — UI quality is the user's call, not
+  the agent's (this is the `verify-on-simulator` rule).
 - **Seed-hook safety**: if writes enqueue cloud-sync / pending changes, guard the
   seed to run only when signed out *and* local data is empty, so demo rows never
   upload; run the writes off the main thread.
