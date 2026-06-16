@@ -3,6 +3,24 @@
 Dated log of what shipped. Newest first. Append an entry when a feature
 lands; keep entries short — the diff is the detail.
 
+## 2026-06-16
+
+- **`ios-app-store-setup` skill: hardened from a real first ship** (hours of
+  going in circles bringing a new XcodeGen + Xcode Cloud app to TestFlight,
+  distilled): (1) lead with **commit the generated `.xcodeproj` + `Package.resolved`**
+  — Xcode Cloud disables on-runner SPM resolution and *refuses*
+  `xcodebuild -resolvePackageDependencies`, so a committed resolved file copied
+  into the workspace by `ci_post_clone.sh` is the fix, not resolving on CI;
+  (2) new §0 **account-level gates** (Free Apps agreement / EU **DSA trader
+  status** / banking) that fail the *export*, not the build; (3) §6 **export-auth
+  triage** — `"Session Proxy Provider: Unable to authenticate with App Store
+  Connect"` is an account/Apple-side gate, not config (and the `"app-store"
+  deprecated` log line is a red herring), plus the **manual interactive upload
+  from Xcode** escape hatch that lands the first build and primes the account;
+  (4) the `Start Condition` **auto-cancel** caveat; (5) internal testers must
+  **accept the TestFlight invite** (`INVITED` → `INSTALLED`) or the app never
+  appears on their device — re-send via `POST /v1/betaTesterInvitations`.
+
 ## 2026-06-15
 
 - **`ios-app-store-setup` skill: assess-first + generated-project guidance**:
