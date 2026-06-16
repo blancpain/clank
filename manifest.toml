@@ -550,6 +550,13 @@ description = "Swift testing — Swift Testing framework, real in-memory DBs ove
 tags = ["swift", "testing"]
 
 [[artifacts]]
+id = "verify-on-simulator"
+type = "rule"
+path = "addons/swift/rules/verify-on-simulator.md"
+description = "Verify UI changes on a simulator (build + screenshot) before cutting a release build — the cloud build is too slow to use as a UI feedback loop"
+tags = ["swift", "process", "workflow"]
+
+[[artifacts]]
 id = "ios-run"
 type = "skill"
 path = "addons/swift/skills/ios-run"
@@ -580,7 +587,7 @@ sql = ["@preset:base-only", "sql-reviewer", "mcp-postgres-safety", "schema-sync-
 supabase = ["@preset:base-only", "mcp-supabase-safety", "supabase-mcp"]
 go = ["@preset:base-only", "go-reviewer", "golangci-lint", "golang-coding-style", "golang-testing", "golang-security", "golang-patterns"]
 rust = ["@preset:base-only", "rust-reviewer", "cargo-clippy", "rust-coding-style", "rust-testing", "rust-security"]
-swift = ["@preset:base-only", "swift-reviewer", "swift-coding-style", "swiftui-patterns", "swift-testing", "ios-run", "appstore-connect", "ios-app-store-setup"]
+swift = ["@preset:base-only", "swift-reviewer", "swift-coding-style", "swiftui-patterns", "swift-testing", "verify-on-simulator", "ios-run", "appstore-connect", "ios-app-store-setup"]
 python-sql = ["@preset:python", "@preset:sql"]
 typescript-sql = ["@preset:typescript", "@preset:sql"]
 fullstack-python = ["@preset:python", "@preset:typescript", "@preset:sql"]

@@ -19,4 +19,4 @@ Nothing is in flight.
   sisu (2026-06-12); other repos get it on their next clank install.
 - New `addons/swift/rules/verify-on-simulator.md` + `ios-run` §2a (2026-06-16):
   Swift projects pick them up on their next clank install. Synced manually into
-  sisu (PR #33); **mangify-ios still needs a clank install** to get them.
+  sisu (PR #34).
