@@ -114,6 +114,11 @@ def request(method: str, path: str, body: bytes | None = None) -> str:
         if host != "api.appstoreconnect.apple.com":
             raise ValueError(f"refusing to send credentials to non-ASC host: {host}")
         url = path
+    elif not path.startswith("/"):
+        sys.exit(
+            f"path must start with '/' (got {path!r}). asc.py is a raw REST "
+            "wrapper, not a subcommand CLI — pass an API path, e.g. /v1/builds"
+        )
     else:
         url = BASE + path
     headers = {"Authorization": "Bearer " + make_token()}
