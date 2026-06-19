@@ -17,6 +17,6 @@ Nothing is in flight.
 - Re-run the installer across existing projects so they pick up the
   project-docs convention (rule + canonical-first pickup/handoff). Done for
   sisu (2026-06-12); other repos get it on their next clank install.
-- New `addons/swift/rules/verify-on-simulator.md` + `ios-run` §2a (2026-06-16):
+- New `addons/swift/rules/release-discipline.md` + `ios-run` §2a (2026-06-16):
   Swift projects pick them up on their next clank install. Synced manually into
   sisu (PR #34).

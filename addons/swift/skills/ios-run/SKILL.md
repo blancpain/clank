@@ -51,7 +51,7 @@ A local simulator build is ~1–2 min; a cloud build + TestFlight round-trip is
 **Before cutting a release/distribution build (a `v*` tag, Xcode Cloud,
 TestFlight, App Store), build to the sim, launch onto the changed screen,
 screenshot, read it, and iterate locally — only release once it looks right.**
-This is enforced by the `verify-on-simulator` rule; this section is the recipe.
+This is enforced by the `release-discipline` rule; this section is the recipe.
 
 The reliable way to land on a specific screen with the right state is a **DEBUG
 launch argument the app checks** — not UI scripting (coordinate taps are
@@ -79,7 +79,7 @@ sleep 4 && xcrun simctl io "$UDID" screenshot /tmp/verify.png   # then Read the 
 - **Get the user's sign-off**: reading the PNG yourself catches *broken* (blank,
   crashed, clipped); for *looks good*, surface the screenshot to the user and get
   their OK before cutting the release tag — UI quality is the user's call, not
-  the agent's (this is the `verify-on-simulator` rule).
+  the agent's (this is the `release-discipline` rule).
 - **Seed-hook safety**: if writes enqueue cloud-sync / pending changes, guard the
   seed to run only when signed out *and* local data is empty, so demo rows never
   upload; run the writes off the main thread.

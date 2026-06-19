@@ -3,6 +3,16 @@
 Dated log of what shipped. Newest first. Append an entry when a feature
 lands; keep entries short — the diff is the detail.
 
+## 2026-06-19
+
+- **Swift rule renamed + expanded: `verify-on-simulator` -> `release-discipline`** — folded the
+  sim-verify gate and a new "cut TestFlight builds incrementally" section into one
+  `addons/swift/rules/release-discipline.md` (manifest id/path + swift preset + `ios-run` SKILL
+  cross-refs updated). The cadence half: after each major feature merges, proactively offer a `v*`
+  build (confirm before tagging), prioritizing device-only-verifiable work (auth/push/links/real
+  backend writes) the simulator can't test. Prompted by a real miss — a whole accounts+community
+  layer (~14 PRs) reached `main` untested-on-device.
+
 ## 2026-06-16
 
 - **Installer guard: no orphan rule/agent/hook files** — `test_install.py` gained
