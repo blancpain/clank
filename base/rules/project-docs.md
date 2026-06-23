@@ -18,9 +18,15 @@ past; CLAUDE.md holds only durable facts plus the pointer.
 
 ## Rules
 
-- **CLAUDE.md stays thin.** Status is a pointer, not a narrative. Durable
-  facts (architecture, invariants, hard-won gotchas) belong in CLAUDE.md's
-  body; everything time-bound goes in the plan or changelog.
+- **CLAUDE.md `## Status` stays thin — and is REPLACED, never appended to.**
+  It is a 2–3 line pointer: the current focus (or last thing shipped) + "read
+  `docs/plan.md`". Each time you touch it, **rewrite it in place** — do not add
+  another dated line on top of the old ones. If it has grown into a per-PR
+  narrative (the common failure — each session adds "…and I shipped X"), that is
+  a bug to fix: trim it back to the pointer. The shipped history lives in the
+  changelog, not here. Durable facts (architecture, invariants, hard-won gotchas)
+  belong in CLAUDE.md's *body*, below Status; everything time-bound goes in the
+  plan or changelog.
 - **Plan entries must pass the fresh-agent test**: a new session should be
   able to start any queued item from its bullet alone — name the entry-point
   files, IDs, URLs, and constraints discovered so far.

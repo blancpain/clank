@@ -55,9 +55,16 @@ touched by this session's work:
 Confirm everything that shipped this session has a terse, dated entry (with
 PR/issue number) at the top of `CHANGELOG.md` — shipped items move OUT of
 the plan and INTO the changelog, in the same handoff. One line per change;
-trivial edits need no entry. Refresh the `## Status` section in `CLAUDE.md`
-if the current focus changed — and add the section if `CLAUDE.md` doesn't
-have one yet (the installer never writes it; see `rules/project-docs.md`).
+trivial edits need no entry.
+
+**Rewrite the `## Status` section in `CLAUDE.md` in place — never append to it.**
+Status is a 2–3 line pointer: the current focus (or the last thing shipped) plus
+"read `docs/plan.md` before starting work." The shipped detail you just wrote into
+the changelog does **not** also go here. If Status has accreted into a dated,
+PR-by-PR narrative — which it will, because every session is tempted to add "…and
+then I shipped X" — that is the bug: **trim it back to those few lines as part of
+this step.** Replace the line; don't grow it. (Add the section if `CLAUDE.md`
+doesn't have one yet — the installer never writes it; see `rules/project-docs.md`.)
 
 ## Step 4: Update persistent memory
 
