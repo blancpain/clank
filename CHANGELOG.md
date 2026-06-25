@@ -3,6 +3,17 @@
 Dated log of what shipped. Newest first. Append an entry when a feature
 lands; keep entries short — the diff is the detail.
 
+## 2026-06-25
+
+- **`/merge` skill (base): rebase-merge the current branch's PR via `gh`** — new
+  `base/skills/merge/SKILL.md` (`disable-model-invocation: true`, slash-command
+  only). Resolves the PR from the current branch (or an explicit number/URL/branch
+  arg), reports state via `gh pr view --json` (mergeable / review decision / CI
+  checks), confirms before the irreversible step, then runs
+  `gh pr merge --rebase --delete-branch`. Supports `--auto` (merge-when-checks-pass)
+  and refuses on conflicts/failing checks unless explicitly overridden (`--admin`).
+  Registered in `manifest.toml` (id `merge`, tags `base`/`git`); 118 tests pass.
+
 ## 2026-06-19
 
 - **Swift rule renamed + expanded: `verify-on-simulator` -> `release-discipline`** — folded the

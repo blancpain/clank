@@ -179,6 +179,13 @@ description = "/review — runs code-reviewer (+ security-reviewer if relevant) 
 tags = ["base", "review"]
 
 [[artifacts]]
+id = "merge"
+type = "skill"
+path = "base/skills/merge"
+description = "/merge — rebase-merge the current branch's PR via gh (confirms first; supports --delete-branch/--auto)"
+tags = ["base", "git"]
+
+[[artifacts]]
 id = "smoke-test"
 type = "skill"
 path = "base/skills/smoke-test"
