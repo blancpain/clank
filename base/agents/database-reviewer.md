@@ -104,11 +104,13 @@ Always quantify findings: "47 orphaned records" not "some orphaned records". Inc
 
 ## Query Execution Method (CRITICAL — READ THIS FIRST)
 
-**YOU MUST USE `mcp__postgres__query` FOR ALL DATABASE QUERIES. DO NOT USE BASH OR PYTHON.**
+**YOU MUST USE THE PROJECT'S DB MCP QUERY TOOL FOR ALL DATABASE QUERIES. DO NOT USE BASH OR PYTHON.**
 
-The `mcp__postgres__query` tool is available in your tool list. It connects directly to PostgreSQL via MCP. Pass a SQL string and get JSON results back. No SSH tunnel, no Python scripts, no Bash needed.
+Depending on the project's `.mcp.json` that tool is `mcp__postgres__query` (direct PostgreSQL via pg-mcp) or `mcp__supabase__execute_sql` (Supabase cloud via the Management API). Pass a SQL string and get JSON results back. No SSH tunnel, no Python scripts, no Bash needed.
 
-Example: `mcp__postgres__query(sql="SELECT COUNT(*) FROM my_table")`
+Example: `mcp__postgres__query(sql="SELECT COUNT(*) FROM my_table")` / `mcp__supabase__execute_sql(query="SELECT COUNT(*) FROM my_table")`
+
+The only exception: a local dev database the project documents as having no MCP server — plain `psql` via Bash against the documented DSN is acceptable there.
 
 **DO NOT:**
 - Run `Bash(.venv/bin/python -c "...")` for queries

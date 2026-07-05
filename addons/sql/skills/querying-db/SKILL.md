@@ -15,13 +15,16 @@ If `schema.txt` does not exist, see `schema.txt.template` in this skill director
 
 ## Step 2: Execute
 
-**Prefer the `mcp__postgres__query` tool** (connects via the PostgreSQL MCP server configured in `.mcp.json`). Pass SQL directly — no Python, no Bash, no SSH needed.
+**Prefer the project's DB MCP tool** (whichever `.mcp.json` configures). Pass SQL directly — no Python, no Bash, no SSH needed:
 
 ```
-mcp__postgres__query(sql="SELECT COUNT(*) FROM users")
+mcp__postgres__query(sql="SELECT COUNT(*) FROM users")         # pg-mcp (direct Postgres)
+mcp__supabase__execute_sql(query="SELECT COUNT(*) FROM users")  # supabase MCP (cloud Management API)
 ```
 
-**Fallback (only if MCP tool is not in your tool list):** find the project's DB connection helper and use it from a Python script.
+If the project documents a local dev database that has no MCP server, plain `psql` via Bash against the documented DSN is acceptable there.
+
+**Fallback (only if no MCP tool is in your tool list):** find the project's DB connection helper and use it from a Python script.
 
 ```bash
 rg 'get_connection|create_engine|DB_URL' --type py -l

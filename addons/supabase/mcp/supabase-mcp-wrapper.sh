@@ -1,5 +1,8 @@
 #!/bin/bash
-# Wrapper to start the Supabase MCP server with credentials from project .env.
+# Wrapper to start the Supabase MCP server with credentials from the project's
+# .env or .env.local (first match wins — same lookup chain as pg-mcp-wrapper,
+# so projects that keep all secrets in one gitignored .env.local need no
+# separate .env).
 #
 # CLOUD-ONLY: @supabase/mcp-server-supabase talks to the Supabase Management
 # API (supabase.com) — it needs a personal access token + cloud project ref and
@@ -8,7 +11,8 @@
 # instance's Postgres instead; it supports multiple databases via named env vars.
 #
 # Requires: npx available in PATH
-# Requires: SUPABASE_ACCESS_TOKEN and SUPABASE_PROJECT_REF set in the project's .env file
+# Requires: SUPABASE_ACCESS_TOKEN and SUPABASE_PROJECT_REF set in the project's
+#           .env or .env.local file
 #
 # Starts in --read-only mode by default. If you need write access (e.g. running
 # mcp__supabase__apply_migration), remove the --read-only flag below. Note that
@@ -17,22 +21,27 @@
 
 PROJECT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 
-if [ -f "$PROJECT_DIR/.env" ]; then
-  SUPABASE_ACCESS_TOKEN=$(awk -F= '/^SUPABASE_ACCESS_TOKEN=/{print substr($0, index($0,"=")+1)}' "$PROJECT_DIR/.env")
-  SUPABASE_PROJECT_REF=$(awk -F= '/^SUPABASE_PROJECT_REF=/{print substr($0, index($0,"=")+1)}' "$PROJECT_DIR/.env")
-fi
+for ENV_FILE in "$PROJECT_DIR/.env" "$PROJECT_DIR/.env.local"; do
+  [ -f "$ENV_FILE" ] || continue
+  if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
+    SUPABASE_ACCESS_TOKEN=$(awk -F= '/^SUPABASE_ACCESS_TOKEN=/{print substr($0, index($0,"=")+1)}' "$ENV_FILE")
+  fi
+  if [ -z "$SUPABASE_PROJECT_REF" ]; then
+    SUPABASE_PROJECT_REF=$(awk -F= '/^SUPABASE_PROJECT_REF=/{print substr($0, index($0,"=")+1)}' "$ENV_FILE")
+  fi
+done
 
 if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
-  echo "ERROR: SUPABASE_ACCESS_TOKEN not found in $PROJECT_DIR/.env" >&2
+  echo "ERROR: SUPABASE_ACCESS_TOKEN not found in $PROJECT_DIR/.env or .env.local" >&2
   echo "Create a personal access token at https://supabase.com/dashboard/account/tokens" >&2
-  echo "Then add SUPABASE_ACCESS_TOKEN=<token> to your project .env file" >&2
+  echo "Then add SUPABASE_ACCESS_TOKEN=<token> to one of those files" >&2
   exit 1
 fi
 
 if [ -z "$SUPABASE_PROJECT_REF" ]; then
-  echo "ERROR: SUPABASE_PROJECT_REF not found in $PROJECT_DIR/.env" >&2
+  echo "ERROR: SUPABASE_PROJECT_REF not found in $PROJECT_DIR/.env or .env.local" >&2
   echo "Find your project ref at https://supabase.com/dashboard/project/_/settings/general" >&2
-  echo "Then add SUPABASE_PROJECT_REF=<ref> to your project .env file" >&2
+  echo "Then add SUPABASE_PROJECT_REF=<ref> to one of those files" >&2
   exit 1
 fi
 
