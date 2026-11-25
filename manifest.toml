@@ -372,7 +372,7 @@ id = "mcp-postgres-safety"
 type = "hook"
 path = "addons/sql/hooks/pretooluse-mcp-postgres-safety.sh"
 settings_fragment = "addons/sql/settings.fragments/mcp-postgres-safety.json"
-description = "PreToolUse guardrail on mcp__postgres__query — blocks DROP/TRUNCATE/DELETE/UPDATE, prompts on ALTER/INSERT"
+description = "PreToolUse guardrail on mcp__postgres__execute_sql — blocks DROP/TRUNCATE/DELETE/UPDATE, prompts on ALTER/INSERT"
 tags = ["sql", "safety", "postgres"]
 
 [[artifacts]]
@@ -395,7 +395,7 @@ id = "pg-mcp"
 type = "mcp"
 path = "addons/sql/mcp/pg-mcp-wrapper.sh"
 mcp_fragment = "addons/sql/mcp/mcp-postgres.json"
-description = "Postgres MCP server — reads DB_URL (or a named var per server, multi-DB capable) from .env/.env.local, launches @modelcontextprotocol/server-postgres (read-only)"
+description = "Postgres MCP server — reads DB_URL (or a named var per server, multi-DB capable) from .env/.env.local, launches Google's MCP Toolbox for Databases (@toolbox-sdk/server, prebuilt postgres tools) with sessions read-only by default"
 tags = ["sql", "postgres"]
 
 [[artifacts]]
