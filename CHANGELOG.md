@@ -5,6 +5,11 @@ lands; keep entries short — the diff is the detail.
 
 ## 2026-11-25
 
+- **Hook fixes carried over from ice-machine** (`fix/hooks-truncate-multiline-project-scope`).
+  `TRUNCATE` now matches only as a whole word in the Bash, file, Postgres and Supabase safety
+  hooks, so text like "truncated" no longer trips the block. The file safety hook flattens the
+  new text first, so `DROP` and `TABLE` on separate lines are caught. The seven lint hooks skip
+  files outside the project (a scratch script in `/tmp`).
 - **Supabase notebook tools switched off** (`fix/supabase-notebooks-and-pin-check`). The wrapper
   now passes `--features` with the server's default tool groups minus `notebooks`. Notebook tools
   run SQL stored in a notebook cell, which the safety hook never sees; on a writable server that

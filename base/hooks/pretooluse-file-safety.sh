@@ -12,7 +12,7 @@ FILE_PATTERNS='(schema|migration|migrations|\.sql$)'
 
 # Extended regex matched against the content (new_string or content field).
 # If the content matches AND the file matches FILE_PATTERNS, the write is blocked.
-FORBIDDEN_PATTERNS='(DROP[[:space:]]+TABLE|DROP[[:space:]]+COLUMN|TRUNCATE|DELETE[[:space:]]+FROM)'
+FORBIDDEN_PATTERNS='(DROP[[:space:]]+TABLE|DROP[[:space:]]+COLUMN|(^|[^a-zA-Z_])TRUNCATE([[:space:]]|/\*)|DELETE[[:space:]]+FROM)'
 # --- END CONFIG ---
 
 # Bail silently if jq isn't available
@@ -29,7 +29,8 @@ FILE_PATH=$(printf '%s' "$INPUT_SAFE" | jq -r '.tool_input.file_path // empty' 2
 # Check if the file matches our pattern
 if echo "$FILE_PATH" | grep -qE "$FILE_PATTERNS"; then
   NEW_TEXT=$(printf '%s' "$INPUT_SAFE" | jq -r '.tool_input.new_string // .tool_input.content // empty')
-  if echo "$NEW_TEXT" | grep -qiE "$FORBIDDEN_PATTERNS"; then
+  # Flattened so a statement split over lines (DROP\n  TABLE x) is still one match
+  if printf '%s' "$NEW_TEXT" | tr '\n' ' ' | grep -qiE "$FORBIDDEN_PATTERNS"; then
     cat >&2 <<'EOF'
 BLOCKED: Destructive DDL detected in a schema/migration file.
 
