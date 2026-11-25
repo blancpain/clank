@@ -3,9 +3,7 @@ name: database-reviewer
 description: "Use this agent when you need to verify the health and integrity of a PostgreSQL database. This includes checking for missing data, duplicate records, schema drift, migration issues, foreign key violations, data format inconsistencies, gaps in time-series data from scheduled jobs, race conditions between concurrent writers, and general data quality validation against the schema.\n\nExamples:\n\n- User: \"The import job has been running hourly but I'm not sure if we're missing any data\"\n  Assistant: \"Let me use the database-reviewer agent to check for gaps in the data and verify the job has been writing consistently.\"\n\n- User: \"I just ran a migration and want to make sure nothing broke\"\n  Assistant: \"I'll launch the database-reviewer agent to verify the migration applied correctly and no data was affected.\"\n\n- User: \"Can you check if our database is healthy?\"\n  Assistant: \"I'll use the database-reviewer agent to run a comprehensive health check across all tables.\"\n\n- User: \"I noticed some weird data in the fact table\"\n  Assistant: \"Let me use the database-reviewer agent to audit that table for duplicates, orphaned records, and format inconsistencies.\"\n\n- After a deployment or schema change, proactively use this agent to verify nothing broke:\n  Assistant: \"The migration has been applied. Let me launch the database-reviewer agent to verify the schema changes took effect correctly and no data integrity issues were introduced.\""
 model: opus
 color: orange
-tools: Read, Grep, Glob, Bash
-mcpServers:
-  - postgres
+tools: Read, Grep, Glob, Bash, mcp__postgres__*, mcp__supabase__execute_sql
 memory: project
 ---
 

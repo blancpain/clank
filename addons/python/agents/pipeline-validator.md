@@ -4,8 +4,6 @@ description: "Use when reviewing Python data-pipeline code that joins DataFrames
 model: sonnet
 color: yellow
 tools: Read, Grep, Glob, Bash
-mcpServers:
-  - postgres
 memory: project
 ---
 
