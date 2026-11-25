@@ -3,6 +3,35 @@
 Dated log of what shipped. Newest first. Append an entry when a feature
 lands; keep entries short — the diff is the detail.
 
+## 2026-11-25
+
+- **Audit against Claude Code 2.1.332: fix what went stale, drop what the harness now does itself**
+  (not yet merged).
+  - **Hooks:** `exit 1` was never a "warn" — it is a non-blocking hook error, so the push reminder
+    and the ALTER/INSERT "get approval" gate gated nothing. `bash-safety` and both MCP safety hooks
+    now return `permissionDecision: "ask"` (a real user prompt) instead. `bash-safety` also runs its
+    block rules before the push prompt and skips them only when *every* segment is a plain git
+    command, closing `git add . && rm -rf x` and `git push; psql -c "DROP TABLE"`. tmux reminder
+    removed (Bash has `run_in_background`).
+  - **Rules:** every language rule is path-scoped with `paths:` frontmatter (`fullstack-python`
+    always-on rules: ~62KB -> ~23KB). Removed `no-inline-comments`, `executing-actions-with-care`
+    (duplicates Claude Code's system prompt), and the generated `agents` rule (Claude Code already
+    lists agents and descriptions) along with `--refresh-agents` and its generator.
+  - **Skill renamed `review` -> `agent-review`:** `/review` is now an alias of the bundled
+    `/code-review`.
+  - **Agents:** removed hand-written memory-path instructions (`memory: project` injects them) and
+    `Edit`/`Write` from read-only reviewers' `tools`; each now states memory files are the only
+    thing it may write, since `memory: project` enables write tools regardless.
+  - **pg-mcp now runs Google's MCP Toolbox for Databases** (`@toolbox-sdk/server
+    --prebuilt=postgres`) instead of the archived `@modelcontextprotocol/server-postgres`. Same
+    `.mcp.json` entry and `DB_URL` in `.env`; the wrapper splits the URL into Toolbox's
+    `POSTGRES_*` variables (JSON-encoded, because Toolbox pastes them into YAML) and opens
+    sessions with `default_transaction_read_only=on` — Toolbox itself is not read-only. Query tool
+    renamed `mcp__postgres__query` -> `mcp__postgres__execute_sql` (hook matcher, `querying-db`,
+    `database-reviewer` updated). Verified end to end against a local Postgres 18.
+  - **Docs:** `plugins.md` rewritten against the current official marketplace; authoring guides
+    and CLAUDE.md brought in line. 107 tests pass.
+
 ## 2026-06-25
 
 - **`/merge` skill (base): rebase-merge the current branch's PR via `gh`** — new
