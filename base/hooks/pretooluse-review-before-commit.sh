@@ -62,7 +62,7 @@ BLOCKED: git commit attempted on a code-bearing diff without a code review in th
 Before retrying:
   1. Dispatch the code-reviewer agent (or the language-specific reviewer if one exists)
      on the staged diff and fix all should-fix findings.
-  2. If a /simplify skill is available, run it on the changed code.
+  2. Run Claude Code's bundled /simplify skill on the changed code.
 
 This hook blocks ONCE per commit window — the next \`git commit\` in this repo will
 pass through without re-blocking (within ${WINDOW_SECONDS}s). Do NOT re-dispatch the
