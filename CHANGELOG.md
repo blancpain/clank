@@ -6,7 +6,7 @@ lands; keep entries short — the diff is the detail.
 ## 2026-11-25
 
 - **Audit against Claude Code 2.1.332: fix what went stale, drop what the harness now does itself**
-  (not yet merged).
+  (`fix/claude-code-audit`, PR #7).
   - **Hooks:** `exit 1` was never a "warn" — it is a non-blocking hook error, so the push reminder
     and the ALTER/INSERT "get approval" gate gated nothing. `bash-safety` and both MCP safety hooks
     now return `permissionDecision: "ask"` (a real user prompt) instead. `bash-safety` also runs its
