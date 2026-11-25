@@ -23,8 +23,9 @@ SQL_FLAT=$(printf '%s' "$SQL" | tr '\n' ' ')
 
 # --- BLOCK RULES (exit 2) ---
 
-# Block destructive SQL: DROP/TRUNCATE/DELETE
-if echo "$SQL_FLAT" | grep -qiE "(DROP[[:space:]]+(TABLE|COLUMN|SCHEMA|INDEX|DATABASE|VIEW|FUNCTION|TRIGGER|SEQUENCE|TYPE)|TRUNCATE|DELETE[[:space:]]+FROM)"; then
+# Block destructive SQL: DROP/TRUNCATE/DELETE. TRUNCATE must be a word followed by
+# whitespace or a comment, so a value like 'truncated' in a SELECT does not trip it.
+if echo "$SQL_FLAT" | grep -qiE "(DROP[[:space:]]+(TABLE|COLUMN|SCHEMA|INDEX|DATABASE|VIEW|FUNCTION|TRIGGER|SEQUENCE|TYPE)|(^|[^a-zA-Z_])TRUNCATE([[:space:]]|/\*)|DELETE[[:space:]]+FROM)"; then
   cat >&2 <<'EOF'
 BLOCKED: Destructive SQL detected via MCP supabase (DROP/TRUNCATE/DELETE).
 Ask the user before proceeding. If approved, the user can run it manually.

@@ -19,6 +19,12 @@ fi
 # Resolve project root from the script's location (.claude/hooks/ -> project root)
 PROJECT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 
+# Skip files outside the project (a scratch file in /tmp, a file in another repo).
+# Both paths are resolved first, so reaching the project through a symlink still matches.
+if [[ "$(cd "$(dirname "$FILE_PATH")" && pwd -P)/" != "$(cd "$PROJECT_DIR" && pwd -P)"/* ]]; then
+  exit 0
+fi
+
 # Find svelte-check binary: local node_modules -> frontend/node_modules -> PATH -> bail silently
 SVELTE_CHECK=""
 if [[ -x "$PROJECT_DIR/node_modules/.bin/svelte-check" ]]; then

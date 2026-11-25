@@ -38,7 +38,9 @@ NON_GIT_SEGMENTS=$(printf '%s' "$COMMAND" | tr '\n' ';' \
 
 if [ -n "$NON_GIT_SEGMENTS" ]; then
   # Block destructive SQL (DROP TABLE/COLUMN/SCHEMA/INDEX, TRUNCATE, DELETE)
-  if echo "$COMMAND_FLAT" | grep -qiE "(DROP[[:space:]]+(TABLE|COLUMN|SCHEMA|INDEX|DATABASE|VIEW|FUNCTION|TRIGGER|SEQUENCE|TYPE)|TRUNCATE|DELETE[[:space:]]+FROM)"; then
+  # TRUNCATE must be a word followed by whitespace or a comment, so "truncated"
+  # in an echo does not trip it.
+  if echo "$COMMAND_FLAT" | grep -qiE "(DROP[[:space:]]+(TABLE|COLUMN|SCHEMA|INDEX|DATABASE|VIEW|FUNCTION|TRIGGER|SEQUENCE|TYPE)|(^|[^a-zA-Z_])TRUNCATE([[:space:]]|/\*)|DELETE[[:space:]]+FROM)"; then
     cat >&2 <<'EOF'
 BLOCKED: Destructive SQL detected (DROP/TRUNCATE/DELETE).
 Ask the user before proceeding. If approved, the user can run it manually.
