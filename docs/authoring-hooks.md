@@ -22,11 +22,28 @@ The exit code controls what happens to the tool call:
 
 | Exit code | Meaning | Effect |
 |-----------|---------|--------|
-| `0` | Pass | Tool call proceeds normally |
-| `1` | Warn | stderr is shown to the user; tool call proceeds after user approval |
+| `0` | Pass | Tool call proceeds through the normal permission flow. JSON on stdout, if any, is applied |
 | `2` | Block | stderr is shown to the model; tool call is prevented |
+| anything else | Hook error | **Non-blocking error.** The tool call proceeds with no prompt and the user sees a hook-error notice |
 
-**JSON decision output** (PostToolUse only): instead of using exit codes, emit a JSON decision to stdout with `exit 0`. This lets the model react and fix issues rather than just being blocked:
+There is no "warn" exit code. `exit 1` does not ask the user for approval and is not a way to send the model a reminder — it only reports that the hook itself failed. Never use it on purpose.
+
+**Asking the user (PreToolUse):** to force a permission prompt, `exit 0` with a JSON decision on stdout. The reason is shown to the user in the prompt:
+
+```bash
+jq -n '{
+  hookSpecificOutput: {
+    hookEventName: "PreToolUse",
+    permissionDecision: "ask",
+    permissionDecisionReason: "git push publishes these commits."
+  }
+}'
+exit 0
+```
+
+`permissionDecision` also accepts `"deny"` (equivalent to `exit 2`, with the reason shown to the model) and `"allow"`. To give the model a non-blocking note instead of a prompt, set `hookSpecificOutput.additionalContext`. Run block rules before ask rules, so a command that is both (a push chained with `rm`) is blocked rather than prompted.
+
+**JSON decision output (PostToolUse):** instead of using exit codes, emit a JSON decision to stdout with `exit 0`. This lets the model react and fix issues rather than just being blocked:
 
 ```bash
 if [[ -n "$ERRORS" ]]; then
@@ -38,7 +55,7 @@ fi
 exit 0
 ```
 
-Use JSON decision output for linters — the model sees the errors and can fix them in the next turn. Use `exit 2` for hard safety blocks (destructive SQL, rm commands) where you want the model to stop, not fix.
+Use JSON decision output for linters — the model sees the errors and can fix them in the next turn. Use `exit 2` for hard safety blocks (destructive SQL, rm commands) where you want the model to stop, not fix. Use `permissionDecision: "ask"` where the action is legitimate but the user should confirm it (pushes, schema-changing SQL).
 
 ---
 

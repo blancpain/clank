@@ -1,6 +1,11 @@
 #!/bin/bash
 # PreToolUse hook: safety checks on MCP postgres queries
-# Exit 0 = pass, Exit 2 = block (stderr to model), Exit 1 = warn (stderr to user)
+#
+# Exit 2 + stderr         = block; the model sees the reason.
+# Exit 0 + JSON on stdout = structured decision ("ask" forces a user prompt).
+# Exit 0, no output       = no objection; the normal permission flow applies.
+# Any other exit code is a non-blocking hook ERROR: the call proceeds with no
+# prompt. Never use one as a "warning".
 
 # Bail silently if jq isn't available
 command -v jq >/dev/null 2>&1 || exit 0
@@ -36,12 +41,18 @@ EOF
   exit 2
 fi
 
-# --- WARN RULES (exit 1) ---
+# --- ASK RULES (exit 0 + JSON — forces a user permission prompt) ---
 
 # ALTER, INSERT — user must approve
 if echo "$SQL_FLAT" | grep -qiE "(ALTER[[:space:]]+TABLE|INSERT[[:space:]]+INTO)"; then
-  echo "⚠ SQL WRITE OPERATION via MCP postgres (ALTER/INSERT). You MUST get explicit user approval — do NOT proceed without it." >&2
-  exit 1
+  jq -n '{
+    hookSpecificOutput: {
+      hookEventName: "PreToolUse",
+      permissionDecision: "ask",
+      permissionDecisionReason: "SQL write (ALTER/INSERT) via MCP postgres. Approve only if you want this change applied to the database."
+    }
+  }'
+  exit 0
 fi
 
 exit 0
