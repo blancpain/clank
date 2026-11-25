@@ -5,7 +5,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Status
 
 Current focus: **none in flight** — Claude Code 2.1.332 audit (hook fixes,
-path-scoped rules, pg-mcp on MCP Toolbox) shipped 2026-11-25 (PR #7). Read
+path-scoped rules, pg-mcp on MCP Toolbox) and `install.py --update` shipped
+2026-11-25. Read
 `docs/plan.md` before starting work; `CHANGELOG.md` logs what shipped.
 
 ## Purpose
@@ -40,7 +41,7 @@ Sub-agents, skills, and hooks are orthogonal mechanisms — pick deliberately:
 - `install.py` — the installer. Stdlib Python 3.11+ only (uses `tomllib`, `shutil`, `json`, `argparse`). Tested via `tests/test_install.py`.
 - `base/` — language-agnostic artifacts (agents, hooks, rules, skills, plugins, settings.json, settings.fragments/). Copied into `<target>/.claude/` regardless of language preset. The `base/` prefix is stripped at install time.
 - `base/templates/` — scaffold sources (manifest type `scaffold`). Unlike every other artifact these land at the **target project root** (manifest `dest`, e.g. `docs/plan.md`, `CHANGELOG.md`), are created only when missing, and are never overwritten or uninstalled — they seed project content the project then owns. The convention they implement lives in `base/rules/project-docs.md`.
-- `addons/<lang>/` — per-language specializations (python, typescript, go, rust, sql). Only copied if the selected preset includes that language. The `addons/<lang>/` prefix is stripped; everything lands under `<target>/.claude/` with the same structure as `base/`.
+- `addons/<lang>/` — per-language specializations (python, typescript, go, rust, swift, sql, supabase). Only copied if the selected preset includes that language. The `addons/<lang>/` prefix is stripped; everything lands under `<target>/.claude/` with the same structure as `base/`.
 - `docs/` — authoring guides (`authoring-agents.md`, `authoring-hooks.md`, `authoring-skills.md`, `authoring-rules.md`, `adding-an-addon.md`) and the install reference (`install.md`). These are clank's own documentation and are NOT copied into target projects.
 - `tests/` — stdlib unittest tests for the installer. Run via `python3 -m unittest tests.test_install -v`.
 - `.github/workflows/test.yml` — CI that runs the test suite on push and PR.
@@ -69,7 +70,7 @@ Non-negotiable when adding or editing artifacts:
 python3 -m unittest tests.test_install -v
 ```
 
-Tests cover: manifest loading and lint, selection resolution (preset expansion, @tag:*, @tag:<name>, default=false), copy logic (file vs. directory), settings.json merge (hook arrays, permissions), install receipt writing and updating, uninstall round-trip, scaffold semantics (copy-if-missing, never-overwrite, uninstall keeps the file), full `install()` orchestration, and the interactive picker.
+Tests cover: manifest loading and lint, selection resolution (preset expansion, @tag:*, @tag:<name>, default=false), copy logic (file vs. directory), settings.json merge (hook arrays, permissions), install receipt writing and updating, uninstall round-trip, scaffold semantics (copy-if-missing, never-overwrite, uninstall keeps the file), full `install()` orchestration, the interactive picker, and `--update` (replace, three-way merge, conflicts, retired and replaced artifacts, changed settings fragments, receipts that predate file tracking).
 
 ## Source attribution
 

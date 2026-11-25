@@ -2,7 +2,7 @@
 
 ## Hook lifecycle events
 
-Claude Code fires hooks at five points in its execution lifecycle:
+Claude Code fires hooks at many points in its lifecycle (session start and end, compaction, notifications and more; see the Claude Code hooks reference for the full list). These are the ones a template is most likely to use — clank itself ships only `PreToolUse` and `PostToolUse` hooks:
 
 | Event | When it fires | Common use |
 |-------|---------------|------------|

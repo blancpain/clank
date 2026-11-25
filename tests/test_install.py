@@ -1519,3 +1519,360 @@ class TestGitignoreManifestField(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestUpdate(unittest.TestCase):
+    """`--update`: a throwaway clank git repo, a target, and one upstream change."""
+
+    MANIFEST_HEAD = 'version = 1\n'
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        root = Path(self.tmp.name)
+        self.clank = root / "clank"
+        self.target = root / "project"
+        self.target.mkdir()
+        (self.clank / "base/rules").mkdir(parents=True)
+        (self.clank / "base/skills/s/sub").mkdir(parents=True)
+        (self.clank / "base/hooks").mkdir()
+        (self.clank / "base/settings.fragments").mkdir()
+        self._git("init", "-q")
+        self.write("base/rules/r.md", "one\ntwo\nthree\nfour\nfive\n")
+        self.write("base/rules/old.md", "old rule\n")
+        self.write("base/skills/s/SKILL.md", "skill v1\n")
+        self.write("base/skills/s/sub/extra.md", "extra\n")
+        self.write("base/hooks/h.sh", "#!/bin/sh\nexit 0\n")
+        self.write("base/settings.fragments/h.json", self.fragment("Bash"))
+        self.artifacts = {
+            "r": 'type = "rule"\npath = "base/rules/r.md"',
+            "old": 'type = "rule"\npath = "base/rules/old.md"',
+            "s": 'type = "skill"\npath = "base/skills/s"',
+            "h": 'type = "hook"\npath = "base/hooks/h.sh"\n'
+            'settings_fragment = "base/settings.fragments/h.json"',
+        }
+        self.commit()
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    @staticmethod
+    def fragment(matcher):
+        return json.dumps(
+            {
+                "hooks": {
+                    "PreToolUse": [
+                        {
+                            "matcher": matcher,
+                            "hooks": [{"type": "command", "command": "h.sh"}],
+                        }
+                    ]
+                }
+            }
+        )
+
+    def _git(self, *args):
+        return subprocess.run(
+            ["git", "-C", str(self.clank), "-c", "user.name=t", "-c", "user.email=t@t", *args],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+
+    def write(self, rel, text):
+        path = self.clank / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text)
+
+    def commit(self):
+        """Write the manifest from self.artifacts and commit everything."""
+        blocks = [
+            f'[[artifacts]]\nid = "{aid}"\n{body}\ntags = ["base"]\n'
+            for aid, body in self.artifacts.items()
+        ]
+        self.write("manifest.toml", self.MANIFEST_HEAD + "\n" + "\n".join(blocks))
+        self._git("add", "-A")
+        self._git("commit", "-q", "-m", "c")
+        return self._git("rev-parse", "HEAD")[:12]
+
+    def install(self, ids):
+        with mock.patch("sys.stdout", io.StringIO()):
+            install.install(
+                manifest_path=self.clank / "manifest.toml",
+                clank_root=self.clank,
+                target=self.target,
+                preset=None,
+                include=ids,
+                exclude=[],
+                conflict_policy="overwrite",
+                dry_run=False,
+                review_hook_opt_in=False,
+                clank_version="test",
+                clank_commit=self._git("rev-parse", "HEAD")[:12],
+            )
+
+    def update(self, dry_run=False):
+        out, err = io.StringIO(), io.StringIO()
+        with mock.patch("sys.stdout", out), mock.patch("sys.stderr", err):
+            rc = install.update(
+                manifest_path=self.clank / "manifest.toml",
+                clank_root=self.clank,
+                target=self.target,
+                dry_run=dry_run,
+                clank_version="test",
+                clank_commit=self._git("rev-parse", "HEAD")[:12],
+            )
+        return rc, out.getvalue() + err.getvalue()
+
+    def installed(self, rel):
+        return self.target / ".claude" / rel
+
+    def strip_tracking(self, commit):
+        """Turn the receipt into one written before files were tracked."""
+        path = self.target / ".claude" / install.RECEIPT_NAME
+        data = json.loads(path.read_text())
+        data.pop("files", None)
+        data.pop("settings_fragments", None)
+        data["clank_commit"] = commit
+        path.write_text(json.dumps(data))
+
+    def test_install_records_files_and_fragments(self):
+        self.install(["r", "h"])
+        receipt = install.read_receipt(self.target)
+        self.assertEqual(
+            receipt["files"]["r"],
+            {".claude/rules/r.md": self._git("rev-parse", "HEAD:base/rules/r.md")},
+        )
+        self.assertEqual(
+            receipt["settings_fragments"]["h"], json.loads(self.fragment("Bash"))
+        )
+
+    def test_unedited_file_is_replaced(self):
+        self.install(["r"])
+        self.write("base/rules/r.md", "one\ntwo\nthree\nfour\nFIVE\n")
+        self.commit()
+        rc, out = self.update()
+        self.assertEqual(rc, 0)
+        self.assertIn("updated", out)
+        self.assertEqual(
+            self.installed("rules/r.md").read_text(), "one\ntwo\nthree\nfour\nFIVE\n"
+        )
+
+    def test_local_edit_is_merged_with_upstream_change(self):
+        self.install(["r"])
+        self.installed("rules/r.md").write_text("ONE\ntwo\nthree\nfour\nfive\n")
+        self.write("base/rules/r.md", "one\ntwo\nthree\nfour\nFIVE\n")
+        self.commit()
+        rc, out = self.update()
+        self.assertEqual(rc, 0)
+        self.assertIn("merged", out)
+        self.assertEqual(
+            self.installed("rules/r.md").read_text(), "ONE\ntwo\nthree\nfour\nFIVE\n"
+        )
+        # The next update starts from the version just merged in.
+        self.write("base/rules/r.md", "one\ntwo\nTHREE\nfour\nFIVE\n")
+        self.commit()
+        self.assertEqual(self.update()[0], 0)
+        self.assertEqual(
+            self.installed("rules/r.md").read_text(), "ONE\ntwo\nTHREE\nfour\nFIVE\n"
+        )
+
+    def test_local_edit_without_upstream_change_is_left_alone(self):
+        self.install(["r"])
+        self.installed("rules/r.md").write_text("mine\n")
+        rc, out = self.update()
+        self.assertEqual(rc, 0)
+        self.assertNotIn("merged", out)
+        self.assertEqual(self.installed("rules/r.md").read_text(), "mine\n")
+
+    def test_conflict_keeps_local_file_and_fails(self):
+        self.install(["r"])
+        self.installed("rules/r.md").write_text("one\ntwo\nthree\nfour\nmine\n")
+        self.write("base/rules/r.md", "one\ntwo\nthree\nfour\ntheirs\n")
+        self.commit()
+        rc, out = self.update()
+        self.assertEqual(rc, 1)
+        self.assertIn("conflict", out)
+        self.assertEqual(
+            self.installed("rules/r.md").read_text(), "one\ntwo\nthree\nfour\nmine\n"
+        )
+        # Still based on the old version, so a later run reports it again.
+        self.assertEqual(self.update()[0], 1)
+
+    def test_retired_artifact_is_removed(self):
+        self.install(["r", "old"])
+        del self.artifacts["old"]
+        (self.clank / "base/rules/old.md").unlink()
+        self.commit()
+        rc, out = self.update()
+        self.assertEqual(rc, 0)
+        self.assertFalse(self.installed("rules/old.md").exists())
+        self.assertEqual(install.read_receipt(self.target)["artifacts"], ["r"])
+
+    def test_retired_artifact_with_local_edits_is_kept(self):
+        self.install(["r", "old"])
+        self.installed("rules/old.md").write_text("my notes\n")
+        del self.artifacts["old"]
+        (self.clank / "base/rules/old.md").unlink()
+        self.commit()
+        rc, out = self.update()
+        self.assertEqual(rc, 1)
+        self.assertEqual(self.installed("rules/old.md").read_text(), "my notes\n")
+        self.assertIn("old", install.read_receipt(self.target)["artifacts"])
+
+    def test_retired_skill_directory_is_removed_and_replacement_installed(self):
+        self.install(["s"])
+        self._git("mv", "base/skills/s", "base/skills/s2")
+        del self.artifacts["s"]
+        self.artifacts["s2"] = 'type = "skill"\npath = "base/skills/s2"\nreplaces = ["s"]'
+        self.commit()
+        rc, _ = self.update()
+        self.assertEqual(rc, 0)
+        self.assertFalse(self.installed("skills/s").exists())
+        self.assertTrue(self.installed("skills/s2/SKILL.md").exists())
+        self.assertTrue(self.installed("skills/s2/sub/extra.md").exists())
+        self.assertEqual(install.read_receipt(self.target)["artifacts"], ["s2"])
+
+    def test_file_dropped_from_a_skill_is_removed(self):
+        self.install(["s"])
+        (self.clank / "base/skills/s/sub/extra.md").unlink()
+        self.commit()
+        self.assertEqual(self.update()[0], 0)
+        self.assertFalse(self.installed("skills/s/sub").exists())
+        self.assertTrue(self.installed("skills/s/SKILL.md").exists())
+
+    def test_changed_settings_fragment_replaces_the_old_entry(self):
+        self.install(["h"])
+        settings_path = self.installed("settings.json")
+        settings = json.loads(settings_path.read_text())
+        settings["hooks"]["PreToolUse"].append(
+            {"matcher": "Read", "hooks": [{"type": "command", "command": "mine.sh"}]}
+        )
+        settings_path.write_text(json.dumps(settings))
+        self.write("base/settings.fragments/h.json", self.fragment("Bash|Write"))
+        self.commit()
+        self.assertEqual(self.update()[0], 0)
+        matchers = [
+            e["matcher"]
+            for e in json.loads(settings_path.read_text())["hooks"]["PreToolUse"]
+        ]
+        self.assertEqual(sorted(matchers), ["Bash|Write", "Read"])
+
+    def test_unchanged_settings_fragment_is_not_put_back(self):
+        self.install(["h"])
+        settings_path = self.installed("settings.json")
+        settings = json.loads(settings_path.read_text())
+        settings.pop("hooks")
+        settings_path.write_text(json.dumps(settings))
+        self.write("base/hooks/h.sh", "#!/bin/sh\nexit 2\n")
+        self.commit()
+        self.assertEqual(self.update()[0], 0)
+        self.assertNotIn("hooks", json.loads(settings_path.read_text()))
+
+    def test_hook_stays_executable(self):
+        self.install(["h"])
+        (self.clank / "base/hooks/h.sh").chmod(0o755)
+        self.write("base/hooks/h.sh", "#!/bin/sh\nexit 2\n")
+        self.commit()
+        self.assertEqual(self.update()[0], 0)
+        self.assertTrue(self.installed("hooks/h.sh").stat().st_mode & 0o100)
+
+    def test_dry_run_writes_nothing(self):
+        self.install(["r", "old"])
+        before = (self.target / ".claude" / install.RECEIPT_NAME).read_text()
+        self.write("base/rules/r.md", "changed\n")
+        del self.artifacts["old"]
+        (self.clank / "base/rules/old.md").unlink()
+        self.commit()
+        rc, out = self.update(dry_run=True)
+        self.assertEqual(rc, 0)
+        self.assertIn("[dry-run]", out)
+        self.assertEqual(
+            self.installed("rules/r.md").read_text(), "one\ntwo\nthree\nfour\nfive\n"
+        )
+        self.assertTrue(self.installed("rules/old.md").exists())
+        self.assertEqual(
+            (self.target / ".claude" / install.RECEIPT_NAME).read_text(), before
+        )
+
+    def test_no_receipt_is_an_error(self):
+        with self.assertRaises(install.InstallError):
+            self.update()
+
+    def test_old_receipt_merges_against_its_commit(self):
+        first = self._git("rev-parse", "HEAD")[:12]
+        self.install(["r"])
+        self.strip_tracking(first)
+        self.installed("rules/r.md").write_text("ONE\ntwo\nthree\nfour\nfive\n")
+        self.write("base/rules/r.md", "one\ntwo\nthree\nfour\nFIVE\n")
+        self.commit()
+        self.assertEqual(self.update()[0], 0)
+        self.assertEqual(
+            self.installed("rules/r.md").read_text(), "ONE\ntwo\nthree\nfour\nFIVE\n"
+        )
+        self.assertIn("files", install.read_receipt(self.target))
+
+    def test_old_receipt_with_newer_commit_does_not_undo_upstream_changes(self):
+        # Installed at the first commit, but the receipt names a later one
+        # (another artifact was installed afterwards). The stale, unedited
+        # file must be replaced, not treated as a local edit.
+        self.install(["r"])
+        self.write("base/rules/r.md", "one\ntwo\nthree\nfour\nFIVE\n")
+        second = self.commit()
+        self.strip_tracking(second)
+        self.write("base/rules/r.md", "one\ntwo\nTHREE\nfour\nFIVE\n")
+        self.commit()
+        self.assertEqual(self.update()[0], 0)
+        self.assertEqual(
+            self.installed("rules/r.md").read_text(), "one\ntwo\nTHREE\nfour\nFIVE\n"
+        )
+
+    def test_old_receipt_naming_a_branch_keeps_edited_files(self):
+        # Tarball installs record the fetched ref ("main"), which resolves to
+        # today's HEAD and so cannot serve as the version that was installed.
+        self.install(["r"])
+        self.strip_tracking("stable")
+        self.installed("rules/r.md").write_text("mine\n")
+        self.write("base/rules/r.md", "theirs\n")
+        self.commit()
+        self._git("branch", "stable")
+        rc, out = self.update()
+        self.assertEqual(rc, 1)
+        self.assertIn("kept", out)
+        self.assertEqual(self.installed("rules/r.md").read_text(), "mine\n")
+        self.assertNotIn("files", install.read_receipt(self.target))
+
+    def test_old_receipt_cannot_remove_a_retired_artifact(self):
+        self.install(["r", "old"])
+        self.strip_tracking(self._git("rev-parse", "HEAD")[:12])
+        del self.artifacts["old"]
+        (self.clank / "base/rules/old.md").unlink()
+        self.commit()
+        rc, out = self.update()
+        self.assertEqual(rc, 1)
+        # Nothing says which files were its own, so it stays, and stays listed.
+        self.assertTrue(self.installed("rules/old.md").exists())
+        self.assertIn("old", install.read_receipt(self.target)["artifacts"])
+
+    def test_uninstall_forgets_tracked_files(self):
+        self.install(["r", "h"])
+        install.uninstall(
+            install.Manifest.load(self.clank / "manifest.toml"),
+            self.clank,
+            self.target,
+            ["h"],
+        )
+        receipt = install.read_receipt(self.target)
+        self.assertEqual(list(receipt["files"]), ["r"])
+        self.assertNotIn("settings_fragments", receipt)
+
+    def test_lint_rejects_replacing_a_live_artifact(self):
+        self.artifacts["r"] += '\nreplaces = ["old"]'
+        self.commit()
+        errors = install.lint_manifest(
+            install.Manifest.load(self.clank / "manifest.toml"), self.clank
+        )
+        self.assertTrue(any("replaces 'old'" in e for e in errors))
+
+    def test_cli_update_flag(self):
+        rc, out, _ = run_install("--help")
+        self.assertIn("--update", out)

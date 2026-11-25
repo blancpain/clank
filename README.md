@@ -83,6 +83,14 @@ Opens a curses picker, one page per category (agents, hooks, rules, skills, exte
 ```
 Prints every artifact with its ID, type, tags, and description.
 
+### Update a project to the current clank
+
+```bash
+./install.py --update --dry-run   # preview
+./install.py --update
+```
+Brings everything the project already has to this clank version. Files you never touched are replaced, files you edited get a three-way merge, and artifacts clank no longer ships are removed. Anything it cannot settle (a merge conflict, an edited file that clank retired) is left as it is, listed, and the command exits 1. See [docs/install.md](docs/install.md#update-workflow).
+
 ### Uninstall
 
 ```bash
@@ -131,6 +139,8 @@ Pass `--preset <name>` to install a named bundle. Presets are composable — eac
 | `go` | base-only + Go reviewer, golangci-lint, Go coding/testing/security/patterns rules |
 | `rust` | base-only + Rust reviewer, cargo-clippy, Rust coding/testing/security rules |
 | `sql` | base-only + SQL reviewer, mcp-postgres-safety hook, SQL safety rule, querying-db skill, migration skill |
+| `supabase` | base-only + Supabase cloud MCP server (read-only) and its safety hook |
+| `swift` | base-only + Swift reviewer, Swift/SwiftUI/testing rules, release-discipline rule, iOS run and App Store skills |
 | `python-sql` | python + sql |
 | `typescript-sql` | typescript + sql |
 | `fullstack-python` | python + typescript + sql |
@@ -138,8 +148,8 @@ Pass `--preset <name>` to install a named bundle. Presets are composable — eac
 
 Artifact categories (run `./install.py --list` to see every ID):
 
-- **agents** — specialist reviewers and researchers (code-reviewer, security-reviewer, database-reviewer, docs-researcher, doc-updater, python/typescript/go/rust/sql reviewers)
-- **hooks** — shell scripts wired into Claude Code events via `settings.json` (PreToolUse safety blocks, PostToolUse linters, Stop review reminder)
+- **agents** — specialist reviewers and researchers (code-reviewer, security-reviewer, database-reviewer, docs-researcher, doc-updater, python/typescript/go/rust/swift/sql reviewers)
+- **hooks** — shell scripts wired into Claude Code events via `settings.json` (PreToolUse safety blocks, PostToolUse linters)
 - **rules** — Markdown rule fragments loaded via `.claude/rules/` (code review process, style, testing, security, patterns). Language rules are path-scoped, so they load only when Claude touches that language's files
 - **skills** — user-invokable procedures (`/agent-review`, `/smoke-test`, `/deploy`, `/querying-db`, `/migration`)
 - **external skills** — fetched from [skills.sh](https://skills.sh) at install time via `npx`
@@ -153,7 +163,7 @@ The `base/` layer is fully language-agnostic — it works on any project and doe
 - A **lint hook** that runs the language's formatter/checker on every edited file (ruff, biome, svelte-check, golangci-lint, cargo clippy)
 - Four **rules files** covering coding style, testing patterns, security pitfalls, and idiomatic patterns
 
-Languages at launch: Python, TypeScript/JavaScript, Go, Rust, and SQL (Postgres-first).
+Addons: Python, TypeScript/JavaScript, Go, Rust, Swift (iOS), SQL (Postgres-first) and Supabase (cloud MCP server).
 
 ## Conflict handling
 
@@ -202,7 +212,7 @@ clank/
 │   ├── skills/
 │   ├── plugins/
 │   └── settings.fragments/
-├── addons/             # per-language specializations (python, typescript, go, rust, sql)
+├── addons/             # per-language specializations (python, typescript, go, rust, swift, sql, supabase)
 │   ├── python/
 │   ├── typescript/
 │   ├── go/

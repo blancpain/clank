@@ -11,10 +11,14 @@ from __future__ import annotations
 
 import argparse
 import copy
+import hashlib
 import json
+import re
 import shutil
 import stat
+import subprocess
 import sys
+import tempfile
 import tomllib
 from datetime import datetime, timezone
 from pathlib import Path
@@ -83,6 +87,19 @@ def lint_manifest(manifest: Manifest, clank_root: Path) -> list[str]:
             not isinstance(gi, list) or not all(isinstance(x, str) for x in gi)
         ):
             errors.append(f"{aid}: gitignore must be a list of strings")
+
+        replaces = artifact.get("replaces")
+        if replaces is not None and (
+            not isinstance(replaces, list)
+            or not all(isinstance(x, str) for x in replaces)
+        ):
+            errors.append(f"{aid}: replaces must be a list of strings")
+        else:
+            for old_id in replaces or []:
+                if old_id in manifest.artifacts:
+                    errors.append(
+                        f"{aid}: replaces {old_id!r}, which is still an artifact"
+                    )
 
         if artifact.get("type") == "external-skill":
             # External skills are fetched at install time via `npx skills add`
@@ -274,12 +291,9 @@ def _copy_file(src: Path, dst: Path, on_conflict: Callable[[Path], str]) -> bool
     return True
 
 
-def _copy_directory(
-    src_dir: Path,
-    dst_dir: Path,
-    on_conflict: Callable[[Path], str],
-) -> bool:
-    any_copied = False
+def _skill_files(src_dir: Path) -> list[Path]:
+    """Files a skill directory ships, as paths relative to it."""
+    files = []
     for src_file in sorted(src_dir.rglob("*")):
         if not src_file.is_file():
             continue
@@ -288,10 +302,45 @@ def _copy_directory(
         # .py helper accumulates __pycache__/*.pyc that must not be installed.
         if "__pycache__" in rel.parts or rel.suffix == ".pyc":
             continue
-        dst_file = dst_dir / rel
-        if _copy_file(src_file, dst_file, on_conflict):
+        files.append(rel)
+    return files
+
+
+def _copy_directory(
+    src_dir: Path,
+    dst_dir: Path,
+    on_conflict: Callable[[Path], str],
+) -> bool:
+    any_copied = False
+    for rel in _skill_files(src_dir):
+        if _copy_file(src_dir / rel, dst_dir / rel, on_conflict):
             any_copied = True
     return any_copied
+
+
+def _artifact_files(
+    artifact: dict, clank_root: Path, target: Path
+) -> list[tuple[Path, Path]]:
+    """(source, destination) for every file a copied artifact installs."""
+    src = clank_root / artifact["path"]
+    dst = _artifact_destination(artifact, target)
+    if artifact.get("type") == "skill":
+        return [(src / rel, dst / rel) for rel in _skill_files(src)]
+    return [(src, dst)]
+
+
+def _blob_sha(data: bytes) -> str:
+    """Git's blob hash of *data*, so clank's own history can serve as the lookup."""
+    return hashlib.sha1(b"blob %d\0" % len(data) + data).hexdigest()
+
+
+def _recorded_files(artifact: dict, clank_root: Path, target: Path) -> dict[str, str]:
+    """Hashes of the artifact's files that are installed exactly as clank ships them."""
+    recorded = {}
+    for src, dst in _artifact_files(artifact, clank_root, target):
+        if dst.is_file() and dst.read_bytes() == src.read_bytes():
+            recorded[dst.relative_to(target).as_posix()] = _blob_sha(src.read_bytes())
+    return recorded
 
 
 def _apply_gitignore(
@@ -720,22 +769,64 @@ def _write_end_of_turn_block(target: Path, block: str) -> None:
 
 RECEIPT_NAME = ".clank-installed.json"
 
+# Not clank-owned content once installed: external skills come from skills.sh,
+# scaffolds belong to the project. Neither is tracked or updated.
+UNTRACKED_TYPES = ("external-skill", "scaffold")
+
 
 def write_receipt(
     target: Path,
     artifacts: list[str],
     clank_version: str,
     clank_commit: str,
+    files: dict[str, dict[str, str]] | None = None,
+    settings_fragments: dict[str, dict] | None = None,
 ) -> None:
+    """Add *artifacts* to the receipt, keeping what it already lists.
+
+    ``files`` maps artifact id -> {installed path: hash of the clank version it
+    came from}; ``settings_fragments`` maps artifact id -> the fragment merged
+    into settings.json. ``--update`` uses both to tell local edits from stale
+    copies and to retract what a previous version added.
+    """
     existing = read_receipt(target)
-    merged = sorted(set(existing.get("artifacts", [])) | set(artifacts))
-    receipt = {
+    all_files = dict(existing.get("files", {}))
+    for aid, recorded in (files or {}).items():
+        all_files[aid] = {**all_files.get(aid, {}), **recorded}
+    _write_receipt_data(
+        target,
+        set(existing.get("artifacts", [])) | set(artifacts),
+        all_files,
+        {**existing.get("settings_fragments", {}), **(settings_fragments or {})},
+        clank_version,
+        clank_commit,
+    )
+
+
+def _write_receipt_data(
+    target: Path,
+    artifacts: set[str],
+    files: dict[str, dict[str, str]],
+    settings_fragments: dict[str, dict],
+    clank_version: str,
+    clank_commit: str,
+) -> None:
+    """Write the receipt with exactly *artifacts*, dropping records of any other id."""
+    receipt: dict = {
         "clank_version": clank_version,
         "clank_commit": clank_commit,
         "installed_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "target": str(target.resolve()),
-        "artifacts": merged,
+        "artifacts": sorted(artifacts),
     }
+    files = {aid: f for aid, f in sorted(files.items()) if aid in artifacts and f}
+    if files:
+        receipt["files"] = files
+    fragments = {
+        aid: f for aid, f in sorted(settings_fragments.items()) if aid in artifacts
+    }
+    if fragments:
+        receipt["settings_fragments"] = fragments
     (target / ".claude" / RECEIPT_NAME).write_text(json.dumps(receipt, indent=2) + "\n")
 
 
@@ -796,17 +887,14 @@ def uninstall(
         installed.discard(aid)
 
     if installed:
-        write_receipt(
+        _write_receipt_data(
             target,
-            sorted(installed),
+            installed,
+            receipt.get("files", {}),
+            receipt.get("settings_fragments", {}),
             receipt.get("clank_version", __version__),
             receipt.get("clank_commit", "unknown"),
         )
-        # write_receipt unions with existing, so overwrite the artifacts field cleanly:
-        receipt_path = target / ".claude" / RECEIPT_NAME
-        data = json.loads(receipt_path.read_text())
-        data["artifacts"] = sorted(installed)
-        receipt_path.write_text(json.dumps(data, indent=2) + "\n")
     else:
         receipt_path = target / ".claude" / RECEIPT_NAME
         if receipt_path.exists():
@@ -828,7 +916,12 @@ def _unmerge_settings(target: Path, fragment: dict) -> None:
     if not settings_path.exists():
         return
     settings = json.loads(settings_path.read_text())
+    _unmerge_settings_dict(settings, fragment)
+    settings_path.write_text(json.dumps(settings, indent=2) + "\n")
 
+
+def _unmerge_settings_dict(settings: dict, fragment: dict) -> None:
+    """Remove from *settings* (in place) what *fragment* would have merged in."""
     for event, frag_entries in (fragment.get("hooks") or {}).items():
         target_entries = settings.get("hooks", {}).get(event, [])
         for frag_entry in frag_entries:
@@ -862,8 +955,6 @@ def _unmerge_settings(target: Path, fragment: dict) -> None:
             settings["permissions"].pop(perm_key)
     if settings.get("permissions") == {}:
         settings.pop("permissions")
-
-    settings_path.write_text(json.dumps(settings, indent=2) + "\n")
 
 
 def _unmerge_mcp(target: Path, fragment: dict) -> None:
@@ -1003,7 +1094,23 @@ def install(
         _apply_gitignore(target, gi_patterns, dry_run=dry_run)
 
     if not dry_run and copied_ids:
-        write_receipt(target, copied_ids, clank_version, clank_commit)
+        copied = [manifest.artifacts[aid] for aid in copied_ids]
+        write_receipt(
+            target,
+            copied_ids,
+            clank_version,
+            clank_commit,
+            files={
+                a["id"]: _recorded_files(a, clank_root, target)
+                for a in copied
+                if a.get("type") not in UNTRACKED_TYPES
+            },
+            settings_fragments={
+                a["id"]: json.loads((clank_root / a["settings_fragment"]).read_text())
+                for a in copied
+                if a.get("settings_fragment")
+            },
+        )
 
     # Rebuild the CLAUDE.md end-of-turn block when new agents were installed.
     if not dry_run:
@@ -1017,6 +1124,264 @@ def install(
             )
 
     print(f"installed: {', '.join(copied_ids) if copied_ids else '(nothing)'}")
+    return 0
+
+
+def _git(clank_root: Path, *args: str) -> bytes | None:
+    """Run git in the clank checkout. None if git or the object is unavailable."""
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(clank_root), *args], capture_output=True, check=False
+        )
+    except OSError:
+        return None
+    return result.stdout if result.returncode == 0 else None
+
+
+def _merge3(local: bytes, base: bytes, new: bytes) -> bytes | None:
+    """Apply the local edits (base -> local) onto *new*. None on conflict."""
+    with tempfile.TemporaryDirectory() as tmp:
+        paths = []
+        for name, data in (("local", local), ("base", base), ("new", new)):
+            path = Path(tmp) / name
+            path.write_bytes(data)
+            paths.append(str(path))
+        try:
+            result = subprocess.run(
+                ["git", "merge-file", "-p", *paths], capture_output=True, check=False
+            )
+        except OSError:
+            return None
+    return result.stdout if result.returncode == 0 else None
+
+
+def _sync_file(
+    local: bytes | None, new: bytes, base_sha: str | None, clank_root: Path
+) -> tuple[str, bytes | None]:
+    """Decide what an update does to one installed file.
+
+    Returns (status, content to write or None). Statuses: "added", "current",
+    "updated" (stale but unedited -> replaced), "merged" (local edits kept on
+    top of the new version), "conflict" and "kept" (both left untouched).
+    """
+    if local is None:
+        return "added", new
+    if local == new:
+        return "current", None
+    local_sha = _blob_sha(local)
+    # Unedited = the version the receipt recorded, or, for receipts written
+    # before files were tracked, any version clank's history has ever held.
+    if local_sha == base_sha or _git(clank_root, "cat-file", "-e", local_sha) is not None:
+        return "updated", new
+    if base_sha == _blob_sha(new):
+        return "current", None  # local edits, and nothing new upstream
+    base = _git(clank_root, "cat-file", "blob", base_sha) if base_sha else None
+    if base is None:
+        return "kept", None
+    merged = _merge3(local, base, new)
+    if merged is None:
+        return "conflict", None
+    return "merged", merged
+
+
+def _prune_empty_dirs(start: Path, stop: Path) -> None:
+    """Remove *start* and its parents while they are empty, never reaching *stop*."""
+    current = start
+    while current != stop and stop in current.parents and current.is_dir():
+        if any(current.iterdir()):
+            return
+        current.rmdir()
+        current = current.parent
+
+
+def update(
+    manifest_path: Path,
+    clank_root: Path,
+    target: Path,
+    dry_run: bool,
+    clank_version: str,
+    clank_commit: str,
+) -> int:
+    """Bring everything the receipt lists to this clank version.
+
+    Unedited files are replaced, locally edited files get a three-way merge,
+    artifacts gone from the manifest are removed (unless edited), and an
+    artifact that ``replaces`` a removed one is installed in its place.
+    Returns 0, or 1 when something was left for the user to resolve.
+    """
+    manifest = Manifest.load(manifest_path)
+    errors = lint_manifest(manifest, clank_root)
+    if errors:
+        for e in errors:
+            print(f"manifest lint error: {e}", file=sys.stderr)
+        return 2
+
+    receipt = read_receipt(target)
+    installed = set(receipt.get("artifacts", []))
+    if not installed:
+        raise InstallError(f"nothing to update: no clank receipt in {target}")
+    tracked_files: dict[str, dict[str, str]] = receipt.get("files", {})
+    tracked_fragments: dict[str, dict] = receipt.get("settings_fragments", {})
+    # Receipts written before files were tracked only know one commit for
+    # everything; use it as the merge base if it is a real commit.
+    # A branch name (tarball installs record the fetched ref) says nothing
+    # about which version was installed, so only a commit hash counts.
+    legacy_commit = receipt.get("clank_commit", "")
+    if (
+        not re.fullmatch(r"[0-9a-f]{7,40}", legacy_commit)
+        or _git(clank_root, "cat-file", "-e", f"{legacy_commit}^{{commit}}") is None
+    ):
+        legacy_commit = ""
+
+    retired = {aid for aid in installed if aid not in manifest.artifacts}
+    replacements = {
+        aid
+        for aid, artifact in manifest.artifacts.items()
+        if retired & set(artifact.get("replaces", []))
+    }
+
+    settings_path = target / ".claude" / "settings.json"
+    settings_before = (
+        json.loads(settings_path.read_text()) if settings_path.exists() else {}
+    )
+    settings = copy.deepcopy(settings_before)
+    mcp_path = target / ".mcp.json"
+    mcp_before = json.loads(mcp_path.read_text()) if mcp_path.exists() else {}
+    mcp = copy.deepcopy(mcp_before)
+
+    kept_ids: set[str] = set()
+    new_files: dict[str, dict[str, str]] = {}
+    new_fragments: dict[str, dict] = {}
+    gi_patterns: list[str] = []
+    counts: dict[str, int] = {}
+    needs_attention = False
+    prefix = "[dry-run] " if dry_run else ""
+
+    def report(status: str, rel: str, note: str = "") -> None:
+        nonlocal needs_attention
+        counts[status] = counts.get(status, 0) + 1
+        if status in ("conflict", "kept"):
+            needs_attention = True
+        if status != "current":
+            print(f"{prefix}{status:9} {rel}{note}")
+
+    def remove_if_unedited(rel: str, sha: str) -> bool:
+        """Delete a file clank no longer ships. False if local edits kept it."""
+        dst = target / rel
+        if not dst.is_file():
+            return True
+        if _blob_sha(dst.read_bytes()) != sha:
+            report("kept", rel, " (no longer in clank, but edited locally)")
+            return False
+        if not dry_run:
+            dst.unlink()
+            _prune_empty_dirs(dst.parent, target / ".claude")
+        report("removed", rel)
+        return True
+
+    for aid in sorted(retired):
+        recorded = tracked_files.get(aid)
+        if recorded is None:
+            # Nothing says which files it owned; leave it listed and say so.
+            kept_ids.add(aid)
+            report("kept", aid, " (no longer in clank; remove its files by hand)")
+            continue
+        left = {rel: sha for rel, sha in recorded.items() if not remove_if_unedited(rel, sha)}
+        if left:
+            kept_ids.add(aid)
+            new_files[aid] = left
+            if aid in tracked_fragments:
+                new_fragments[aid] = tracked_fragments[aid]
+        elif aid in tracked_fragments:
+            _unmerge_settings_dict(settings, tracked_fragments[aid])
+
+    for aid in sorted((installed - retired) | replacements):
+        artifact = manifest.artifacts[aid]
+        kept_ids.add(aid)
+        if artifact.get("type") in UNTRACKED_TYPES:
+            continue
+        recorded = tracked_files.get(aid, {})
+        synced: dict[str, str] = {}
+        for src, dst in _artifact_files(artifact, clank_root, target):
+            rel = dst.relative_to(target).as_posix()
+            new = src.read_bytes()
+            base_sha = recorded.get(rel)
+            if base_sha is None and legacy_commit:
+                looked_up = _git(
+                    clank_root,
+                    "rev-parse",
+                    f"{legacy_commit}:{src.relative_to(clank_root).as_posix()}",
+                )
+                base_sha = looked_up.decode().strip() if looked_up else None
+            status, content = _sync_file(
+                dst.read_bytes() if dst.is_file() else None, new, base_sha, clank_root
+            )
+            if content is not None and not dry_run:
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                dst.write_bytes(content)
+                shutil.copymode(src, dst)
+            if status in ("conflict", "kept"):
+                if base_sha:
+                    synced[rel] = base_sha
+                note = (
+                    " (local edits clash with the new version; merge by hand)"
+                    if status == "conflict"
+                    else " (edited locally and no base version to merge against)"
+                )
+                report(status, rel, note)
+            else:
+                synced[rel] = _blob_sha(new)
+                report(status, rel)
+        for rel, sha in recorded.items():
+            if rel not in synced and not remove_if_unedited(rel, sha):
+                synced[rel] = sha
+        new_files[aid] = synced
+
+        frag_rel = artifact.get("settings_fragment")
+        if frag_rel:
+            fragment = json.loads((clank_root / frag_rel).read_text())
+            previous = tracked_fragments.get(aid)
+            # An unchanged fragment is left alone, so wiring the project
+            # removed on purpose is not put back on every update.
+            if previous != fragment:
+                if previous is not None:
+                    _unmerge_settings_dict(settings, previous)
+                settings = merge_settings(settings, fragment)
+            new_fragments[aid] = fragment
+        mcp_frag_rel = artifact.get("mcp_fragment")
+        if mcp_frag_rel and aid not in installed:
+            mcp = merge_mcp(mcp, json.loads((clank_root / mcp_frag_rel).read_text()))
+        for pattern in artifact.get("gitignore", []):
+            if pattern not in gi_patterns:
+                gi_patterns.append(pattern)
+
+    if settings != settings_before:
+        report("updated", ".claude/settings.json")
+        if not dry_run:
+            settings_path.write_text(json.dumps(settings, indent=2) + "\n")
+    if mcp != mcp_before:
+        report("updated", ".mcp.json")
+        if not dry_run:
+            mcp_path.write_text(json.dumps(mcp, indent=2) + "\n")
+    if gi_patterns:
+        _apply_gitignore(target, gi_patterns, dry_run=dry_run)
+
+    if not dry_run:
+        _write_receipt_data(
+            target, kept_ids, new_files, new_fragments, clank_version, clank_commit
+        )
+        if kept_ids != installed:
+            _write_end_of_turn_block(target, _generate_end_of_turn_review(kept_ids))
+
+    summary = ", ".join(f"{n} {status}" for status, n in sorted(counts.items()))
+    print(f"{prefix}update: {summary or 'nothing installed'}")
+    if needs_attention:
+        print(
+            "clank: some files were left as they are — see the 'kept' and "
+            "'conflict' lines above",
+            file=sys.stderr,
+        )
+        return 1
     return 0
 
 
@@ -1515,6 +1880,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Comma-separated artifact IDs to uninstall from --target",
     )
     parser.add_argument(
+        "--update",
+        action="store_true",
+        help="Bring everything already installed in --target to this clank "
+        "version: merge local edits, remove what clank no longer ships",
+    )
+    parser.add_argument(
         "--version",
         action="version",
         version=f"clank {__version__}",
@@ -1562,6 +1933,16 @@ def _main_impl(argv: list[str] | None) -> int:
         uninstall(manifest, clank_root, target, ids)
         print(f"uninstalled: {', '.join(ids)}")
         return 0
+
+    if args.update:
+        return update(
+            manifest_path=manifest_path,
+            clank_root=clank_root,
+            target=_resolve_target(args),
+            dry_run=args.dry_run,
+            clank_version=__version__,
+            clank_commit=_git_commit(clank_root),
+        )
 
     include = [x.strip() for x in (args.include or "").split(",") if x.strip()]
     exclude = [x.strip() for x in (args.exclude or "").split(",") if x.strip()]
