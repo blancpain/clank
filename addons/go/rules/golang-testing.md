@@ -1,3 +1,8 @@
+---
+paths:
+  - "**/*.go"
+---
+
 # Go Testing
 
 Use Go's built-in `testing` package as the foundation. These rules cover table-driven tests, parallelism, golden files, and benchmarks.

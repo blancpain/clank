@@ -1,3 +1,17 @@
+---
+paths:
+  - "**/*.ts"
+  - "**/*.tsx"
+  - "**/*.mts"
+  - "**/*.cts"
+  - "**/*.js"
+  - "**/*.jsx"
+  - "**/*.mjs"
+  - "**/*.cjs"
+  - "**/*.svelte"
+  - "**/*.vue"
+---
+
 # TypeScript Coding Style
 
 Follow these TypeScript-specific conventions in addition to the general coding style guidelines.

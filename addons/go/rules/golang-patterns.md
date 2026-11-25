@@ -1,3 +1,8 @@
+---
+paths:
+  - "**/*.go"
+---
+
 # Go Patterns
 
 Idiomatic Go patterns for common design problems. Prefer these over ad-hoc solutions.

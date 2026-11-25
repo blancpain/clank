@@ -1,3 +1,8 @@
+---
+paths:
+  - "**/*.rs"
+---
+
 # Rust Testing
 
 Use Rust's built-in `#[test]` framework as the foundation. These rules cover unit tests, integration tests, property testing, benchmarks, and doctests.

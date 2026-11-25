@@ -1,3 +1,8 @@
+---
+paths:
+  - "**/*.swift"
+---
+
 # SwiftUI Patterns
 
 Hard-won SwiftUI conventions. These prevent the bug classes that cost the most debugging time: state loss, render loops, and stale UI.

@@ -102,13 +102,6 @@ description = "Smoke-test and optimize before running long scripts"
 tags = ["base", "process"]
 
 [[artifacts]]
-id = "no-inline-comments"
-type = "rule"
-path = "base/rules/no-inline-comments.md"
-description = "Avoid comments inside python -c multiline strings (bash security heuristic)"
-tags = ["base", "safety"]
-
-[[artifacts]]
 id = "update-agent-memory"
 type = "rule"
 path = "base/rules/update-agent-memory.md"
@@ -130,13 +123,6 @@ description = "Don't re-run a review subagent on a diff that's already been revi
 tags = ["base", "review", "process"]
 
 [[artifacts]]
-id = "executing-actions-with-care"
-type = "rule"
-path = "base/rules/executing-actions-with-care.md"
-description = "Reversibility, blast radius, and confirmation discipline for risky actions"
-tags = ["base", "safety"]
-
-[[artifacts]]
 id = "branch-per-feature"
 type = "rule"
 path = "base/rules/branch-per-feature.md"
@@ -149,13 +135,6 @@ type = "rule"
 path = "base/rules/surgical-changes.md"
 description = "Touch only what the task requires — no adjacent refactors, no deleting pre-existing dead code"
 tags = ["base", "process", "style"]
-
-[[artifacts]]
-id = "agents"
-type = "rule"
-path = "base/rules/agents.md"
-description = "Index of available agents and when to delegate"
-tags = ["base", "agents"]
 
 [[artifacts]]
 id = "testing"
@@ -172,10 +151,10 @@ description = "KISS/DRY/YAGNI, file organization, naming, immutability"
 tags = ["base", "style"]
 
 [[artifacts]]
-id = "review"
+id = "agent-review"
 type = "skill"
-path = "base/skills/review"
-description = "/review — runs code-reviewer (+ security-reviewer if relevant) on recent changes"
+path = "base/skills/agent-review"
+description = "/agent-review — runs the project's code-reviewer agent (+ security-reviewer if relevant) on recent changes"
 tags = ["base", "review"]
 
 [[artifacts]]
@@ -586,7 +565,7 @@ description = "First-time iOS App Store / TestFlight bootstrap via Xcode Cloud �
 tags = ["swift", "release"]
 
 [presets]
-minimal = ["bash-safety", "file-safety", "code-reviewer", "executing-actions-with-care"]
+minimal = ["bash-safety", "file-safety", "code-reviewer"]
 base-only = ["@tag:base"]
 python = ["@preset:base-only", "python-reviewer", "pipeline-validator", "ruff", "python-coding-style", "python-testing", "python-security", "python-patterns"]
 typescript = ["@preset:base-only", "typescript-reviewer", "frontend-reviewer", "biome", "svelte-check", "typescript-coding-style", "typescript-testing", "typescript-security", "typescript-patterns"]

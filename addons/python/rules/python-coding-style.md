@@ -1,3 +1,8 @@
+---
+paths:
+  - "**/*.py"
+---
+
 # Python Coding Style
 
 Follow these Python-specific conventions in addition to the general coding style guidelines.

@@ -1,3 +1,8 @@
+---
+paths:
+  - "**/*.go"
+---
+
 # Go Coding Style
 
 Follow these Go-specific conventions in addition to the general coding style guidelines. Go has strong community conventions enforced by `gofmt` and `golangci-lint` — lean into them.

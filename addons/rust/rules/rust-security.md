@@ -1,3 +1,8 @@
+---
+paths:
+  - "**/*.rs"
+---
+
 # Rust Security
 
 Security rules for Rust code. Rust's ownership system eliminates whole classes of vulnerabilities, but new attack surfaces exist around `unsafe`, integer semantics, and dependency supply chains.

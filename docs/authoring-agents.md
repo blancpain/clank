@@ -16,7 +16,7 @@ name: my-agent
 description: "Use this agent when ... (router signal)"
 model: sonnet
 color: cyan
-tools: Read, Grep, Glob, Bash, Edit
+tools: Read, Grep, Glob, Bash
 memory: project
 mcpServers:
   - postgres
@@ -45,7 +45,7 @@ The difference: the good version tells Claude *when* to invoke the agent. The ba
 
 ### `model`
 
-Which Claude model the agent runs on. Options: `sonnet`, `opus`, `haiku`. Match model to task:
+Which Claude model the agent runs on. Options: an alias (`sonnet`, `opus`, `haiku`, `fable`), a full model ID, or `inherit` to use the main conversation's model. When omitted, the agent also inherits the main conversation's model. Match model to task:
 
 - `sonnet` — default for most reviewers and researchers (good balance of quality and speed)
 - `opus` — complex reasoning tasks, architecture-level decisions
@@ -60,13 +60,15 @@ Optional. Sets the agent's label color in the Claude Code UI. Useful for visual 
 Comma-separated list of Claude Code tools the agent is allowed to use. Always be explicit — do not omit this field.
 
 Common combinations:
-- Read-only auditor: `Read, Grep, Glob, Bash` (Bash for `git diff`, `python -c` checks only)
+- Read-only auditor: `Read, Grep, Glob, Bash` (Bash for `git diff`, `python -c` checks only). Never list `Edit` or `Write` on an agent whose prompt says read-only.
 - Researcher: `Read, Grep, Glob, Bash, WebFetch`
 - Writer: `Read, Grep, Glob, Bash, Edit, Write`
 
 ### `memory`
 
 Set to `project` if the agent should maintain memory files under `.claude/agent-memory/<name>/`. When set, the agent persists findings, patterns, and institutional knowledge across conversations.
+
+Claude Code does the plumbing: it adds memory instructions and the start of the agent's `MEMORY.md` to the agent's system prompt, and it **automatically enables `Read`, `Write`, and `Edit`** so the agent can manage its memory files — whatever the `tools` list says. So a `memory: project` agent can always write files; the `tools` list alone cannot make it read-only (see [Read-only agent convention](#read-only-agent-convention)).
 
 Omit this field for agents that don't need cross-conversation memory (e.g., one-shot researchers).
 
@@ -120,28 +122,23 @@ operations (chmod, mkdir, touch, tee, write, cp, mv, rm, etc.).**
 
 This phrasing is deliberately strong. Read-only agents should still include `Bash` in their `tools` list to allow `git diff` and inline Python checks, but the prompt forbids all write operations.
 
----
-
-## Memory path discipline
-
-If the agent uses `memory: project`, all memory writes must go to:
-
-```
-<project-root>/.claude/agent-memory/<name>/
-```
-
-Never to a subdirectory's `.claude/`. The agent's working directory may vary (Claude may launch it from a subdirectory), so memory paths must always reference the project root explicitly. State this in the agent prompt:
+Keep `Edit` and `Write` out of a read-only agent's `tools` list. If the agent also sets `memory: project`, Claude Code enables those tools anyway for its memory files, so the prompt is what holds the line. Follow the read-only clause with:
 
 ```markdown
-**Memory: If you write agent memory, always write it to the project root
-`.claude/agent-memory/code-reviewer/` directory — never to a subdirectory's `.claude/`.**
+**The one exception is your own agent memory: you may write memory files, and nothing else.**
 ```
+
+---
+
+## Memory guidance in the prompt
+
+Don't tell the agent where or how to write memory — `memory: project` already injects the location, the file format, and the `MEMORY.md` index. Use the prompt only for what Claude Code can't know: **what is worth remembering** for this agent (e.g. "baseline row counts and schema quirks, never issue lists").
 
 ---
 
 ## Output format consistency
 
-All clank reviewer agents use the same output structure. Maintain this format for new reviewer agents so the `/review` skill can consolidate findings across multiple agents:
+All clank reviewer agents use the same output structure. Maintain this format for new reviewer agents so the `/agent-review` skill can consolidate findings across multiple agents:
 
 ```
 ## [Lang] Code Review Summary
@@ -194,9 +191,8 @@ Field notes:
 - [ ] `description` is a router signal ("use when..."), not a feature summary
 - [ ] `name` is unique across all agents in the manifest
 - [ ] Read-only clause is included if the agent should not modify files
-- [ ] Memory path discipline stated in the prompt if `memory: project`
+- [ ] No `Edit`/`Write` in `tools` if the agent is read-only; memory exception line present if `memory: project`
 - [ ] Output format matches the standard reviewer structure if this is a reviewer agent
 - [ ] `[[artifacts]]` entry added to `manifest.toml` with correct `path` and `tags`
 - [ ] `python3 -c "import tomllib; tomllib.load(open('manifest.toml','rb'))"` passes (no TOML syntax errors)
 - [ ] `./install.py --list` shows the new agent
-- [ ] If the agent is a language reviewer, update `base/rules/agents.md` to add it to the Available Agents table

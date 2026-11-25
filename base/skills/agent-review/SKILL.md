@@ -1,12 +1,16 @@
 ---
-name: review
-description: "Run code review on recently modified code. Invoke via /review."
+name: agent-review
+description: "Run the project's reviewer agents (code-reviewer, plus security-reviewer when relevant) on recently modified code. Invoke via /agent-review."
 disable-model-invocation: true
 ---
 
-# Code Review
+# Agent Review
 
 Run `code-reviewer` (and optionally `security-reviewer`) on recent changes.
+
+This is the project's own review, driven by its reviewer agents and their
+memory. It is separate from Claude Code's bundled `/code-review` (and its
+`/review` alias), which is why it has a different name.
 
 ## Step 1: Identify Changes
 
@@ -32,7 +36,7 @@ If there are no changes (empty output), report "No changes to review" and stop.
 
 ## Step 2: Dispatch code-reviewer
 
-Using the Task tool, dispatch the `code-reviewer` agent **in the background** with the list of changed files as context. Do NOT wait for it before proceeding to Step 3.
+Using the Agent tool, dispatch the `code-reviewer` agent **in the background** with the list of changed files as context. Do NOT wait for it before proceeding to Step 3.
 
 Pass the diff output and file list so the agent has full context.
 

@@ -15,11 +15,11 @@ description = "Second stub agent for installer tests"
 tags = ["base", "test"]
 
 [[artifacts]]
-id = "agents"
+id = "stub-rule"
 type = "rule"
-path = "base/rules/agents.md"
-description = "Index of available agents and when to delegate"
-tags = ["base", "agents"]
+path = "base/rules/stub-rule.md"
+description = "Stub rule for installer tests"
+tags = ["base", "test"]
 
 [[artifacts]]
 id = "stub-hook"

@@ -1,3 +1,17 @@
+---
+paths:
+  - "**/*.ts"
+  - "**/*.tsx"
+  - "**/*.mts"
+  - "**/*.cts"
+  - "**/*.js"
+  - "**/*.jsx"
+  - "**/*.mjs"
+  - "**/*.cjs"
+  - "**/*.svelte"
+  - "**/*.vue"
+---
+
 # TypeScript Patterns
 
 Apply these TypeScript-specific idioms and patterns for correctness and maintainability.

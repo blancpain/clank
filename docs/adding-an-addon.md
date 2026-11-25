@@ -67,7 +67,7 @@ name: python-reviewer
 description: "Expert Python code reviewer. Use PROACTIVELY when reviewing Python code — FastAPI endpoints, async code, DataFrame pipelines, or any Python file. Use alongside the base code-reviewer for language-specific depth."
 model: sonnet
 color: yellow
-tools: Read, Grep, Glob, Bash, Edit
+tools: Read, Grep, Glob, Bash
 memory: project
 ---
 ```
@@ -75,7 +75,7 @@ memory: project
 - `name` must be unique across all installed agents
 - `description` is a routing signal — start with "Expert [lang] code reviewer. Use PROACTIVELY when..."
 - `color` differentiates this agent visually from `code-reviewer` (which uses `cyan`)
-- `tools` should include `Bash` for `git diff` and inline checks, but omit `Write` for read-only agents
+- `tools` should include `Bash` for `git diff` and inline checks, but omit `Edit` and `Write` for read-only agents
 
 **Opening block (read-only clause):**
 
@@ -84,11 +84,10 @@ memory: project
 create files, or make any changes whatsoever — not even to /tmp.**
 ```
 
-**Memory path discipline:**
+**Memory exception** (`memory: project` enables `Read`/`Write`/`Edit` for memory files, so say what they are for):
 
 ```markdown
-**Memory: If you write agent memory, always write it to the project root
-`.claude/agent-memory/python-reviewer/` directory — never to a subdirectory's `.claude/`.**
+**The one exception is your own agent memory: you may write memory files, and nothing else.**
 ```
 
 **Review dimensions** — focus on the language's failure modes:
@@ -97,7 +96,7 @@ create files, or make any changes whatsoever — not even to /tmp.**
 - Go: goroutine leaks, error wrapping, context propagation
 - Rust: ownership violations, unsafe blocks, panic discipline
 
-**Output format** — use the same structure as `code-reviewer.md` so the `/review` skill can consolidate findings:
+**Output format** — use the same structure as `code-reviewer.md` so the `/agent-review` skill can consolidate findings:
 
 ```
 ## [Lang] Code Review Summary
@@ -209,7 +208,7 @@ If your hook is `PreToolUse` (e.g. a safety hook like `mcp-postgres-safety`), ch
 
 ## Step 5: Write the rules
 
-Create 3-4 rules in `addons/<lang>/rules/`. Each covers one topic. Follow the naming pattern `<lang>-<topic>.md`.
+Create 3-4 rules in `addons/<lang>/rules/`. Each covers one topic. Follow the naming pattern `<lang>-<topic>.md`. Start each with `paths:` frontmatter listing the language's file globs, so the rule loads only when Claude touches that language's files (see [authoring-rules.md](authoring-rules.md#path-scoped-rules)).
 
 Standard topics:
 
@@ -223,6 +222,11 @@ Standard topics:
 From `addons/python/rules/python-coding-style.md`:
 
 ```markdown
+---
+paths:
+  - "**/*.py"
+---
+
 # Python Coding Style
 
 - Follow **PEP 8** conventions for naming and layout
@@ -356,33 +360,13 @@ All existing tests must still pass.
 
 ---
 
-## Step 9: Update `base/rules/agents.md`
-
-If the new addon ships a reviewer agent, add it to the "Available Agents" table in `base/rules/agents.md`:
-
-```markdown
-| <lang>-reviewer | <Lang> specialist review | Python/TypeScript/... code changes |
-```
-
-Include a note that it may not be present if the addon was not installed:
-
-```markdown
-> Language-specific reviewers (python-reviewer, typescript-reviewer, etc.) may be present
-> if their addon is installed — use them alongside code-reviewer for language-specific depth.
-```
-
-This note already exists in `base/rules/agents.md`. You only need to add the row to the table.
-
----
-
-## Step 10: Commit
+## Step 9: Commit
 
 One commit per addon:
 
 ```bash
 git add addons/<lang>/
 git add manifest.toml
-git add base/rules/agents.md  # if updated
 git commit -m "feat(addons/<lang>): add <lang> addon — reviewer, <linter> hook, rules"
 ```
 

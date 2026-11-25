@@ -527,119 +527,6 @@ def merge_mcp(target: dict, fragment: dict) -> dict:
     return result
 
 
-def _parse_agent_frontmatter(path: Path) -> dict[str, str]:
-    """Extract name and description from an agent .md file's YAML frontmatter.
-
-    Returns {"name": ..., "description": ...} with empty-string defaults.
-    Handles the ``---`` delimited frontmatter that Claude Code agent files use.
-    """
-    result: dict[str, str] = {"name": path.stem, "description": ""}
-    try:
-        text = path.read_text()
-    except OSError:
-        return result
-    if not text.startswith("---"):
-        return result
-    end = text.find("---", 3)
-    if end == -1:
-        return result
-    for line in text[3:end].splitlines():
-        if ":" not in line:
-            continue
-        key, _, value = line.partition(":")
-        key = key.strip()
-        value = value.strip().strip('"').strip("'")
-        if key in ("name", "description"):
-            result[key] = value
-    return result
-
-
-def _generate_agents_rule(
-    manifest: Manifest,
-    installed_ids: set[str],
-    target: Path | None = None,
-) -> str:
-    """Build rules/agents.md content from installed + discovered agent artifacts.
-
-    Returns the full markdown string, or "" if no agents are found.
-    The generated file replaces the static base/rules/agents.md so the rule
-    always reflects reality — no stale rows for agents the user didn't pick,
-    no missing rows for addon agents they did, and custom agents the user
-    dropped in by hand are picked up too.
-
-    When *target* is provided, ``.claude/agents/*.md`` is scanned for files
-    not covered by the manifest. Their frontmatter is parsed for a name and
-    description so they appear in the table alongside manifest-installed agents.
-    """
-    # 1. Manifest-installed agents: (name, description) from manifest metadata
-    agents: list[tuple[str, str]] = []
-    manifest_agent_files: set[str] = set()
-    for aid in sorted(installed_ids):
-        artifact = manifest.artifacts.get(aid)
-        if not artifact or artifact.get("type") != "agent":
-            continue
-        agents.append((aid, artifact.get("description", "")))
-        # Track the filename so we can skip it when scanning the target dir
-        manifest_agent_files.add(Path(artifact["path"]).name)
-
-    # 2. Discover custom agents the user added manually
-    if target is not None:
-        agents_dir = target / ".claude" / "agents"
-        if agents_dir.is_dir():
-            for md_file in sorted(agents_dir.glob("*.md")):
-                if md_file.name in manifest_agent_files:
-                    continue
-                fm = _parse_agent_frontmatter(md_file)
-                agents.append((fm["name"], fm["description"]))
-
-    if not agents:
-        return ""
-
-    lines = [
-        "# Agent Orchestration",
-        "",
-        "**IMPORTANT: You MUST use these agents proactively.** Do not wait for",
-        "the user to ask — invoke the matching agent immediately whenever your",
-        "work falls within an agent's purpose.",
-        "",
-        "| Agent | When to invoke |",
-        "|-------|----------------|",
-    ]
-    for name, desc in agents:
-        lines.append(f"| **{name}** | {desc} |")
-
-    lines.extend(
-        [
-            "",
-            "## Parallel Task Execution",
-            "",
-            "Dispatch agents in parallel when their work is independent.",
-            "Multiple Agent tool uses in one assistant message:",
-            "",
-            "```markdown",
-            "# GOOD: Parallel execution",
-            "Launch 2 agents in parallel:",
-            "1. Agent 1: code-reviewer on the diff",
-            "2. Agent 2: security-reviewer on the auth changes",
-            "",
-            "# BAD: Sequential when unnecessary",
-            "First code-reviewer, then wait, then security-reviewer",
-            "```",
-            "",
-            "## Multi-Perspective Analysis",
-            "",
-            "For complex problems, use split-role subagents in parallel:",
-            "- Factual reviewer",
-            "- Senior engineer",
-            "- Security expert",
-            "- Consistency reviewer",
-            "",
-        ]
-    )
-
-    return "\n".join(lines)
-
-
 END_OF_TURN_BEGIN = "<!-- clank:end-of-turn-review:begin -->"
 END_OF_TURN_END = "<!-- clank:end-of-turn-review:end -->"
 # Heading used by the generator and by earlier (pre-markers) clank installs.
@@ -925,21 +812,10 @@ def uninstall(
         if receipt_path.exists():
             receipt_path.unlink()
 
-    # Regenerate agents.md if an agent was removed but the rule itself remains.
-    agents_rule_dst = target / ".claude" / "rules" / "agents.md"
+    # Rebuild the CLAUDE.md end-of-turn block so it drops uninstalled reviewers.
     removed_agents = any(
         manifest.artifacts[aid].get("type") == "agent" for aid in artifact_ids
     )
-    if removed_agents and agents_rule_dst.exists() and "agents" not in artifact_ids:
-        remaining = set(read_receipt(target).get("artifacts", []))
-        content = _generate_agents_rule(manifest, remaining, target)
-        if content:
-            agents_rule_dst.write_text(content)
-        else:
-            # No agents left — remove the now-empty rule
-            agents_rule_dst.unlink()
-
-    # Rebuild the CLAUDE.md end-of-turn block so it drops uninstalled reviewers.
     if removed_agents:
         remaining = set(read_receipt(target).get("artifacts", []))
         _write_end_of_turn_block(
@@ -1129,21 +1005,11 @@ def install(
     if not dry_run and copied_ids:
         write_receipt(target, copied_ids, clank_version, clank_commit)
 
-    # Regenerate agents.md dynamically based on actually-installed agents.
-    # Triggers when the agents rule itself is installed, OR when new agent
-    # artifacts are added to an existing install that already has the rule.
+    # Rebuild the CLAUDE.md end-of-turn block when new agents were installed.
     if not dry_run:
-        agents_rule_dst = target / ".claude" / "rules" / "agents.md"
         new_agents = any(
             manifest.artifacts[aid].get("type") == "agent" for aid in copied_ids
         )
-        if "agents" in copied_ids or (agents_rule_dst.exists() and new_agents):
-            all_installed = set(read_receipt(target).get("artifacts", []))
-            content = _generate_agents_rule(manifest, all_installed, target)
-            if content:
-                agents_rule_dst.parent.mkdir(parents=True, exist_ok=True)
-                agents_rule_dst.write_text(content)
-
         if new_agents:
             all_installed = set(read_receipt(target).get("artifacts", []))
             _write_end_of_turn_block(
@@ -1649,11 +1515,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="Comma-separated artifact IDs to uninstall from --target",
     )
     parser.add_argument(
-        "--refresh-agents",
-        action="store_true",
-        help="Regenerate agents.md from installed + discovered agents, then exit",
-    )
-    parser.add_argument(
         "--version",
         action="version",
         version=f"clank {__version__}",
@@ -1700,44 +1561,6 @@ def _main_impl(argv: list[str] | None) -> int:
         ids = [x.strip() for x in args.uninstall.split(",") if x.strip()]
         uninstall(manifest, clank_root, target, ids)
         print(f"uninstalled: {', '.join(ids)}")
-        return 0
-
-    if args.refresh_agents:
-        target = _resolve_target(args)
-        manifest = Manifest.load(manifest_path)
-        agents_dst = target / ".claude" / "rules" / "agents.md"
-        all_installed = set(read_receipt(target).get("artifacts", []))
-        content = _generate_agents_rule(manifest, all_installed, target)
-        if content:
-            agents_dst.parent.mkdir(parents=True, exist_ok=True)
-            agents_dst.write_text(content)
-            # Count agents in the generated output
-            agent_count = sum(
-                1 for aid in all_installed
-                if manifest.artifacts.get(aid, {}).get("type") == "agent"
-            )
-            # Count custom agents from disk
-            agents_dir = target / ".claude" / "agents"
-            if agents_dir.is_dir():
-                manifest_files = {
-                    Path(manifest.artifacts[aid]["path"]).name
-                    for aid in all_installed
-                    if manifest.artifacts.get(aid, {}).get("type") == "agent"
-                }
-                agent_count += sum(
-                    1
-                    for f in agents_dir.glob("*.md")
-                    if f.name not in manifest_files
-                )
-            print(f"agents.md refreshed ({agent_count} agents)")
-        else:
-            if agents_dst.exists():
-                agents_dst.unlink()
-            print("agents.md removed (no agents found)")
-
-        _write_end_of_turn_block(
-            target, _generate_end_of_turn_review(all_installed)
-        )
         return 0
 
     include = [x.strip() for x in (args.include or "").split(",") if x.strip()]

@@ -55,7 +55,7 @@ Available presets:
 
 | Preset | Contents |
 |--------|----------|
-| `minimal` | bash-safety, file-safety, code-reviewer, executing-actions-with-care |
+| `minimal` | bash-safety, file-safety, code-reviewer |
 | `base-only` | Every artifact tagged `base` |
 | `python` | base-only + Python reviewer, ruff hook, Python rules |
 | `typescript` | base-only + TypeScript reviewer, biome, svelte-check, TypeScript rules |

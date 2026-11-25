@@ -1,3 +1,8 @@
+---
+paths:
+  - "**/*.swift"
+---
+
 # Swift Testing
 
 Conventions for testing Swift packages and apps.

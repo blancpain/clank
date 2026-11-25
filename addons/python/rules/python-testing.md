@@ -1,3 +1,8 @@
+---
+paths:
+  - "**/*.py"
+---
+
 # Python Testing
 
 Use **pytest** as the testing framework. These rules extend the general testing guidelines with Python-specific patterns.

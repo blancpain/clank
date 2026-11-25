@@ -39,7 +39,7 @@ Every example below runs from inside the project directory. `curl | sh -s -- <fl
 ```bash
 ./install.py --preset minimal
 ```
-Prompts `y/N` to confirm CWD, then installs `minimal` (core safety hooks + code-reviewer + actions-with-care rule) into `./.claude/`.
+Prompts `y/N` to confirm CWD, then installs `minimal` (core safety hooks + code-reviewer) into `./.claude/`.
 
 ### Non-interactive (CI, scripts)
 
@@ -124,8 +124,8 @@ Pass `--preset <name>` to install a named bundle. Presets are composable — eac
 
 | Preset | What it installs |
 |--------|-----------------|
-| `minimal` | Core safety hooks + code-reviewer agent + actions-with-care rule |
-| `base-only` | All language-agnostic artifacts: 5 agents, 2 safety hooks, 8 rules, 3 skills, plugin doc |
+| `minimal` | Core safety hooks + code-reviewer agent |
+| `base-only` | All language-agnostic artifacts: 5 agents, 2 safety hooks, 10 rules, 6 skills, plan/changelog scaffolds, plugin doc |
 | `python` | base-only + Python reviewer, ruff hook, Python coding/testing/security/patterns rules |
 | `typescript` | base-only + TypeScript reviewer, biome, svelte-check, TypeScript coding/testing/security/patterns rules |
 | `go` | base-only + Go reviewer, golangci-lint, Go coding/testing/security/patterns rules |
@@ -140,8 +140,8 @@ Artifact categories (run `./install.py --list` to see every ID):
 
 - **agents** — specialist reviewers and researchers (code-reviewer, security-reviewer, database-reviewer, docs-researcher, doc-updater, python/typescript/go/rust/sql reviewers)
 - **hooks** — shell scripts wired into Claude Code events via `settings.json` (PreToolUse safety blocks, PostToolUse linters, Stop review reminder)
-- **rules** — Markdown rule fragments loaded via `.claude/rules/` (code review process, safety discipline, style, testing, security, patterns)
-- **skills** — user-invokable procedures (`/review`, `/smoke-test`, `/deploy`, `/querying-db`, `/migration`)
+- **rules** — Markdown rule fragments loaded via `.claude/rules/` (code review process, style, testing, security, patterns). Language rules are path-scoped, so they load only when Claude touches that language's files
+- **skills** — user-invokable procedures (`/agent-review`, `/smoke-test`, `/deploy`, `/querying-db`, `/migration`)
 - **external skills** — fetched from [skills.sh](https://skills.sh) at install time via `npx`
 - **plugin-docs** — reference list of recommended Claude Code plugins
 
