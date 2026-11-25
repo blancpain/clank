@@ -17,7 +17,15 @@
 # Starts in --read-only mode by default. If you need write access (e.g. running
 # mcp__supabase__apply_migration), remove the --read-only flag below. Note that
 # the companion `mcp-supabase-safety` hook still blocks destructive SQL at the
-# tool-call layer even when the server is writable.
+# tool-call layer even when the server is writable. The hook only sees SQL passed
+# to execute_sql and apply_migration: a writable server also offers notebook
+# tools (run_notebook, create_notebook) whose SQL it never sees.
+#
+# The version is pinned so a new release cannot change the tools under every
+# project at once. Raise it deliberately, after checking the tool names still
+# match the safety hook and the agents' `tools` lists.
+
+SUPABASE_MCP_VERSION=0.19.0
 
 PROJECT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 
@@ -46,4 +54,4 @@ if [ -z "$SUPABASE_PROJECT_REF" ]; then
 fi
 
 export SUPABASE_ACCESS_TOKEN
-exec npx -y @supabase/mcp-server-supabase --project-ref "$SUPABASE_PROJECT_REF" --read-only
+exec npx -y "@supabase/mcp-server-supabase@$SUPABASE_MCP_VERSION" --project-ref "$SUPABASE_PROJECT_REF" --read-only

@@ -24,6 +24,11 @@
 
 READ_ONLY=true
 
+# Pinned so a new Toolbox release cannot change the tools under every project
+# at once. Raise it deliberately, after checking the tool names still match
+# the safety hook and the agents' `tools` lists.
+TOOLBOX_VERSION=1.18.0
+
 VAR_NAME="${1:-DB_URL}"
 PROJECT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 
@@ -77,4 +82,4 @@ if [ -z "$POSTGRES_HOST" ] || [ "$POSTGRES_DATABASE" = '""' ] || [ "$POSTGRES_US
 fi
 
 export POSTGRES_HOST POSTGRES_PORT POSTGRES_DATABASE POSTGRES_USER POSTGRES_PASSWORD POSTGRES_QUERY_PARAMS
-exec npx -y @toolbox-sdk/server --prebuilt=postgres --stdio
+exec npx -y "@toolbox-sdk/server@$TOOLBOX_VERSION" --prebuilt=postgres --stdio
