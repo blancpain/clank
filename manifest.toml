@@ -17,6 +17,8 @@
 #     tags               — list of strings; used by @tag:<name> expansion in presets
 #     settings_fragment  — (optional) path to the hook's settings.json fragment
 #     default            — (optional) bool; false excludes from @tag/@preset expansion
+#     replaces           — (optional) list of retired artifact IDs this one supersedes;
+#                          `--update` installs it wherever one of them was installed
 #     source             — (external-skill only) repo ref passed to `npx skills add`
 #     skill_name         — (external-skill only) `--skill <name>` and install dir name
 #
@@ -154,6 +156,7 @@ type = "skill"
 path = "base/skills/agent-review"
 description = "/agent-review — runs the project's code-reviewer agent (+ security-reviewer if relevant) on recent changes"
 tags = ["base", "review"]
+replaces = ["review"]
 
 [[artifacts]]
 id = "merge"

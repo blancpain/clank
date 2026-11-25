@@ -163,6 +163,16 @@ cd ~/repos/api
 ./install.py --uninstall ruff,python-reviewer
 ```
 
+### `--update`
+
+Bring everything already installed in the target to this clank version. Takes no artifact list — it works from the receipt. Combine with `--dry-run` to preview. See [Update workflow](#update-workflow).
+
+```bash
+cd ~/repos/api
+./install.py --update --dry-run
+./install.py --update
+```
+
 ### `--version`
 
 Print the clank version and exit.
@@ -282,7 +292,15 @@ Structure:
     "python-security",
     "python-testing",
     "ruff"
-  ]
+  ],
+  "files": {
+    "ruff": {
+      ".claude/hooks/ruff-check.sh": "3b18e512dba79e4c8300dd08aeb37f8e728b8dad"
+    }
+  },
+  "settings_fragments": {
+    "ruff": { "hooks": { "PostToolUse": [ { "matcher": "Edit|Write", "hooks": [ "..." ] } ] } }
+  }
 }
 ```
 
@@ -291,6 +309,46 @@ Structure:
 - `installed_at` — ISO 8601 timestamp in UTC
 - `target` — resolved absolute path of the target directory
 - `artifacts` — sorted list of artifact IDs that were copied. IDs that were skipped at the conflict prompt are not listed. Re-running the installer merges into this list.
+- `files` — per artifact, each installed file and the git blob hash of the clank version it came from. `--update` compares the file on disk with this hash to tell an untouched copy from one you edited, and fetches that version from clank's history as the base for a merge. External skills and scaffolds are not tracked.
+- `settings_fragments` — per artifact, the fragment that was merged into `settings.json`, so a later update or removal can retract exactly that.
+
+Receipts written before 2026-11-25 have neither map. The first `--update` adds them (see below).
+
+---
+
+## Update workflow
+
+```bash
+./install.py --target ~/repos/api --update --dry-run   # preview
+./install.py --target ~/repos/api --update
+```
+
+For every artifact in the receipt, per file:
+
+| Status | Meaning |
+|--------|---------|
+| `current` | Already matches clank (not printed) |
+| `added` | A file clank now ships that the project did not have |
+| `updated` | You never edited it; replaced with the new version |
+| `merged` | You edited it and clank changed it; your edits are re-applied on top of the new version (`git merge-file`) |
+| `removed` | Clank no longer ships it and you never edited it |
+| `conflict` | Your edits and clank's touch the same lines; the file is left as it is |
+| `kept` | Left as it is: an edited file clank retired, or an edited file with no base version to merge against |
+
+Also:
+
+- **Retired artifacts** (in the receipt, gone from the manifest) are removed and dropped from the receipt. Their `settings.json` entries are retracted. Their `.mcp.json` server entry is left alone — remove it by hand if you no longer want the server.
+- **Replacements.** An artifact whose manifest entry lists `replaces = ["old-id"]` is installed wherever `old-id` was.
+- **Changed settings fragments.** If an artifact's fragment changed (say a hook's matcher), the old entry is retracted and the new one merged. Entries you added yourself are not touched. An unchanged fragment is not re-merged, so wiring you removed on purpose stays removed. `.mcp.json` entries are only added for artifacts the update newly installs.
+- **External skills and scaffolds** are skipped: the first belong to skills.sh, the second to the project.
+
+`conflict` and `kept` lines mean something is left for you; the command then exits 1. Fix those files by hand (or re-install the artifact with `--include <id> --force` to take clank's version) and run `--update` again.
+
+**Requirements.** Merging needs clank to be a git checkout, because the base version comes from clank's history. From a tarball install, untouched files are still replaced and edited ones are reported as `kept`.
+
+**Receipts that predate file tracking.** A file counts as untouched if its content matches any version in clank's history. For an edited file, the base is the version at the receipt's `clank_commit`; review the resulting diff in your project, since that commit is only accurate if everything was installed in one go. If `clank_commit` is a branch name (tarball installs record the fetched ref), edited files are `kept`, and a retired artifact cannot be removed automatically because nothing records which files were its own.
+
+After any update, look at `git diff` in the project before committing.
 
 ---
 

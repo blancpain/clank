@@ -14,23 +14,14 @@ Nothing is in flight.
 
 ## Later / external
 
-- **Downstream cleanup after the 2026-11-25 audit.** The installer has no
-  notion of retired artifacts, so a re-install leaves these behind in projects
-  that already have them; delete by hand (and drop the ids from
-  `.claude/.clank-installed.json` if listed): `.claude/rules/agents.md`,
-  `.claude/rules/no-inline-comments.md`,
-  `.claude/rules/executing-actions-with-care.md`, `.claude/skills/review/`
-  (replaced by `agent-review`). Re-install to pick up the fixed hooks and
-  path-scoped rules.
-- **pg-mcp moved to MCP Toolbox (2026-11-25).** Re-installing the sql preset
-  swaps the wrapper in place; `.mcp.json` and `DB_URL` in `.env` need no
-  change. The query tool is now `mcp__postgres__execute_sql`, so update any
-  project-local prompts or permission rules that name `mcp__postgres__query`.
-  The old `mcp__postgres[a-z0-9-]*__query` hook entry stays in
-  `.claude/settings.json` (it never matches now; delete it by hand).
-- Re-run the installer across existing projects so they pick up the
-  project-docs convention (rule + canonical-first pickup/handoff). Done for
-  sisu (2026-06-12); other repos get it on their next clank install.
-- New `addons/swift/rules/release-discipline.md` + `ios-run` §2a (2026-06-16):
-  Swift projects pick them up on their next clank install. Synced manually into
-  sisu (PR #34).
+- **Updating a project:** run `./install.py --update` from the project (see
+  `docs/install.md`, "Update workflow"). horses, sisu, mangify-ios and mangify
+  are on tracked receipts as of 2026-11-25, so retired artifacts and local
+  edits are handled from here on.
+- **ice-machine** carries an old, hand-maintained copy (its receipt names a
+  branch, not a commit), so `--update` cannot merge there. Sync it by hand or
+  re-install with `--force` when it matters.
+- **MCP server versions are pinned** in the two wrappers
+  (`TOOLBOX_VERSION`, `SUPABASE_MCP_VERSION`). When raising one, re-check the
+  tool names against the safety hooks and the `tools` line of
+  `database-reviewer`.

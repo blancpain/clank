@@ -5,6 +5,21 @@ lands; keep entries short — the diff is the detail.
 
 ## 2026-11-25
 
+- **`install.py --update`** (`feat/installer-update`). Brings everything in a project's receipt to
+  the current clank: untouched files are replaced, edited files get a three-way merge against the
+  version they came from, retired artifacts are removed (kept if edited), and a changed settings
+  fragment retracts its old entry. Conflicts are left alone and reported; exit 1. The receipt now
+  records each installed file's git blob hash and each merged settings fragment, which is what
+  makes this exact; older receipts are adopted on first run. New manifest field `replaces`
+  (`agent-review` replaces `review`). 20 new tests.
+- **MCP server versions pinned** in both wrappers (`@toolbox-sdk/server@1.18.0`,
+  `@supabase/mcp-server-supabase@0.19.0`), so a new release cannot change the tools under every
+  project at once. The Supabase wrapper now notes that a writable server's notebook tools run SQL
+  the safety hook never sees.
+- **Docs caught up:** Swift and Supabase added to the addon and preset lists, the "Stop review
+  reminder" (never shipped) and "five hook events" wording removed, `docs/plan.md` cleared of the
+  downstream cleanup that is now done.
+
 - **Removed the `requires_mcp` manifest field** (`chore/drop-requires-mcp`). It was documented as
   an install-time warning, but `install.py` never read it, and its one remaining use
   (`database-reviewer` -> `postgres`) would be wrong for Supabase projects anyway.
