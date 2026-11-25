@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Status
 
-Current focus: **none in flight** — `appstore-connect` skill (swift addon)
-shipped 2026-06-13. Read `docs/plan.md` before starting work; `CHANGELOG.md`
-logs what shipped.
+Current focus: **none in flight** — Claude Code 2.1.332 audit (hook fixes,
+path-scoped rules, pg-mcp on MCP Toolbox) shipped 2026-11-25 (PR #7). Read
+`docs/plan.md` before starting work; `CHANGELOG.md` logs what shipped.
 
 ## Purpose
 
