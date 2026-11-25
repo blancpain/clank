@@ -18,8 +18,6 @@ model: sonnet
 color: cyan
 tools: Read, Grep, Glob, Bash
 memory: project
-mcpServers:
-  - postgres
 ---
 ```
 
@@ -63,6 +61,12 @@ Common combinations:
 - Read-only auditor: `Read, Grep, Glob, Bash` (Bash for `git diff`, `python -c` checks only). Never list `Edit` or `Write` on an agent whose prompt says read-only.
 - Researcher: `Read, Grep, Glob, Bash, WebFetch`
 - Writer: `Read, Grep, Glob, Bash, Edit, Write`
+- Database auditor: `Read, Grep, Glob, Bash, mcp__postgres__*, mcp__supabase__execute_sql`
+
+**MCP tools must be named here.** Once an agent has a `tools` list, it gets no MCP tool the list
+doesn't name. Name one tool (`mcp__<server>__<tool>`) or a whole server (`mcp__<server>__*`).
+A name that matches nothing in the project is ignored, so one agent can list the tools of
+several alternative servers. Project hooks still run on MCP calls an agent makes.
 
 ### `memory`
 
@@ -74,13 +78,12 @@ Omit this field for agents that don't need cross-conversation memory (e.g., one-
 
 ### `mcpServers`
 
-List of MCP server names the agent requires. This is a **soft hint** — the installer surfaces a warning if the server is not configured in the project's `.mcp.json`, but the agent is still installed. The agent itself should check for tool availability and warn gracefully if a required MCP tool is missing.
+Leave it out. Listing a server by name (`mcpServers: [postgres]`) does **not** give the agent that
+server's tools when the agent also has a `tools` list — checked on Claude Code 2.1.332, where such
+an agent could not call the server at all. Grant MCP tools through `tools` instead (see above).
 
-Example:
-```yaml
-mcpServers:
-  - postgres
-```
+The field's real use is an inline server definition that should exist only while the agent runs,
+which no clank agent needs.
 
 ---
 

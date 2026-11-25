@@ -247,7 +247,6 @@ type = "agent"
 path = "addons/python/agents/pipeline-validator.md"
 description = "Data pipeline auditor — empty-join detection, float→string ID traps, SQL correctness, assertion coverage"
 tags = ["python", "review", "data"]
-requires_mcp = ["postgres"]
 
 [[artifacts]]
 id = "ruff"

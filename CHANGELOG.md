@@ -5,6 +5,13 @@ lands; keep entries short — the diff is the detail.
 
 ## 2026-11-25
 
+- **Database agents can now reach the database** (`fix/agent-mcp-tools`). `database-reviewer`
+  declared `tools: Read, Grep, Glob, Bash` plus `mcpServers: [postgres]`; with a `tools` list, a
+  server named in `mcpServers` grants nothing, so the agent never had a query tool (and fell back
+  to `psql` or raw API calls, past the safety hook). Its `tools` now name
+  `mcp__postgres__*` and `mcp__supabase__execute_sql`. `pipeline-validator` never queries, so its
+  `mcpServers` line and `requires_mcp` hint are gone. `docs/authoring-agents.md` documents the rule.
+
 - **Audit against Claude Code 2.1.332: fix what went stale, drop what the harness now does itself**
   (`fix/claude-code-audit`, PR #7).
   - **Hooks:** `exit 1` was never a "warn" — it is a non-blocking hook error, so the push reminder
