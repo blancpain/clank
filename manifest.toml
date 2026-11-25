@@ -17,7 +17,6 @@
 #     tags               — list of strings; used by @tag:<name> expansion in presets
 #     settings_fragment  — (optional) path to the hook's settings.json fragment
 #     default            — (optional) bool; false excludes from @tag/@preset expansion
-#     requires_mcp       — (optional) list of MCP server names; soft hint only
 #     source             — (external-skill only) repo ref passed to `npx skills add`
 #     skill_name         — (external-skill only) `--skill <name>` and install dir name
 #
@@ -60,7 +59,6 @@ type = "agent"
 path = "base/agents/database-reviewer.md"
 description = "Postgres database integrity auditor — schema drift, gaps, duplicates, FK integrity, operational health"
 tags = ["base", "review", "postgres"]
-requires_mcp = ["postgres"]
 
 [[artifacts]]
 id = "bash-safety"
