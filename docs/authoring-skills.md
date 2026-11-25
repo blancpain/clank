@@ -14,15 +14,17 @@ Skills live in `.claude/skills/<name>/` in the target project. The installer cop
 
 ```yaml
 ---
-name: review
-description: "Run code review on recently modified code. Invoke via /review."
+name: agent-review
+description: "Run the project's reviewer agents (code-reviewer, plus security-reviewer when relevant) on recently modified code. Invoke via /agent-review."
 disable-model-invocation: true
 ---
 ```
 
 ### `name`
 
-Unique identifier. For user-invokable skills, this becomes the `/command` name (e.g. `name: review` → `/review`).
+Unique identifier. For user-invokable skills, this becomes the `/command` name (e.g. `name: agent-review` → `/agent-review`).
+
+Don't reuse the name of a command or skill Claude Code ships itself (`/review`, `/code-review`, `/simplify`, `/security-review`, `/init`, …). A project skill with the same name shadows the built-in one, and which of the two a user gets stops being obvious. That is why clank's review skill is `agent-review`, not `review`.
 
 ### `description`
 
@@ -35,14 +37,14 @@ When present, the skill activates **only** when the user types `/<name>` explici
 - User-invokable workflows that should not fire automatically (deploy, migration, review)
 - Procedures where you want the user to be deliberately in control
 
-All clank user-facing skills (`review`, `deploy`, `smoke-test`, `querying-db`, `migration`) use `disable-model-invocation: true`.
+clank's slash-command skills (`agent-review`, `deploy`, `smoke-test`, `merge`, `handoff`, `pickup`, `migration`) use `disable-model-invocation: true`.
 
 ---
 
 ## Skill directory structure
 
 ```
-base/skills/review/
+base/skills/agent-review/
     SKILL.md          — the skill procedure (required)
 
 addons/sql/skills/querying-db/
@@ -84,7 +86,7 @@ Quick decision:
 
 A skill body is a numbered procedure. Be concrete: include shell commands, decision points, and exact output formats. Do not just describe what to do — show how.
 
-Good skill body (from `base/skills/review/SKILL.md`):
+Good skill body (from `base/skills/agent-review/SKILL.md`):
 
 ```markdown
 ## Step 1: Identify Changes
@@ -99,7 +101,7 @@ If there are no changes (empty output), report "No changes to review" and stop.
 
 ## Step 2: Dispatch code-reviewer
 
-Using the Task tool, dispatch the `code-reviewer` agent **in the background** with
+Using the Agent tool, dispatch the `code-reviewer` agent **in the background** with
 the list of changed files as context. Do NOT wait for it before proceeding to Step 3.
 ```
 
@@ -118,7 +120,7 @@ User-invokable skills follow a consistent pattern:
 2. `disable-model-invocation: true` in frontmatter
 3. Body is a step-by-step procedure, not a description
 
-Example: `/review` invokes `base/skills/review/SKILL.md`. `/deploy` invokes `base/skills/deploy/SKILL.md`. `/querying-db` invokes `addons/sql/skills/querying-db/SKILL.md`.
+Example: `/agent-review` invokes `base/skills/agent-review/SKILL.md`. `/deploy` invokes `base/skills/deploy/SKILL.md`. `/querying-db` invokes `addons/sql/skills/querying-db/SKILL.md`.
 
 This pattern works well for user-invokable entry points to project-specific workflows.
 
@@ -146,7 +148,7 @@ Use `# TODO: fill in ...` comments to mark every section the user must customize
 
 ## Examples
 
-**`base/skills/review/SKILL.md`** — auto-structured workflow with `disable-model-invocation: true`. Dispatches `code-reviewer` and optionally `security-reviewer` in parallel, then consolidates findings into a single report. No supporting files.
+**`base/skills/agent-review/SKILL.md`** — auto-structured workflow with `disable-model-invocation: true`. Dispatches `code-reviewer` and optionally `security-reviewer` in parallel, then consolidates findings into a single report. No supporting files.
 
 **`base/skills/deploy/SKILL.md`** — scaffold skill with `disable-model-invocation: true`. Ships a complete workflow (pre-flight → deploy → verify → rollback) with `# TODO` placeholders for the deploy command and health check. The user edits this once after install.
 

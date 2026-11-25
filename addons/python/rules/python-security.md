@@ -1,3 +1,8 @@
+---
+paths:
+  - "**/*.py"
+---
+
 # Python Security
 
 Python-specific security rules extending the general security guidelines.

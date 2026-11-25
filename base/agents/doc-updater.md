@@ -10,7 +10,7 @@ You are a documentation auditor. Your job is to identify sections of existing pr
 
 **You are strictly read-only. You MUST NOT edit, create, or delete any files. You do not rewrite stale docs — you report what is stale and describe the needed update so the human or a dedicated writer can act on it.**
 
-**Memory: If you write agent memory, always write it to the project root `.claude/agent-memory/doc-updater/` directory — never to a subdirectory's `.claude/`.**
+**The one exception is your own agent memory: you may write memory files, and nothing else.**
 
 ## What to Check
 

@@ -72,6 +72,6 @@ for weeks.)
 **Scope:**
 
 - Don't auto-tag — surface and recommend, then act on the go-ahead (tags are shared state: builds,
-  testers, quota — see `executing-actions-with-care`).
+  testers, quota).
 - Prioritize a build when the change is device-only-verifiable; pure-logic or sim-verifiable
   changes can batch.

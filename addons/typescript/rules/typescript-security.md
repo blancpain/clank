@@ -1,3 +1,17 @@
+---
+paths:
+  - "**/*.ts"
+  - "**/*.tsx"
+  - "**/*.mts"
+  - "**/*.cts"
+  - "**/*.js"
+  - "**/*.jsx"
+  - "**/*.mjs"
+  - "**/*.cjs"
+  - "**/*.svelte"
+  - "**/*.vue"
+---
+
 # TypeScript Security
 
 Apply these TypeScript/JavaScript-specific security rules in addition to the general security guidelines.

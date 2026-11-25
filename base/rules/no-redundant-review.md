@@ -12,7 +12,7 @@ In the third case, only dispatch the reviewer that has not run — do not re-dis
 
 ## Why
 
-Stop hooks, `/review` skills, and proactive reminders can keep prompting Claude to run code review. Without a stop condition, this produces back-and-forth loops where the same diff is reviewed repeatedly, burning tokens and rarely surfacing new findings.
+Stop hooks, review skills (`/agent-review`, `/code-review`), and proactive reminders can keep prompting Claude to run code review. Without a stop condition, this produces back-and-forth loops where the same diff is reviewed repeatedly, burning tokens and rarely surfacing new findings.
 
 ## How to apply
 

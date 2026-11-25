@@ -1,3 +1,8 @@
+---
+paths:
+  - "**/*.swift"
+---
+
 # Swift Coding Style
 
 Follow these Swift-specific conventions in addition to the general coding style guidelines. Lean on the Swift API Design Guidelines — they are the community standard.

@@ -1,3 +1,17 @@
+---
+paths:
+  - "**/*.ts"
+  - "**/*.tsx"
+  - "**/*.mts"
+  - "**/*.cts"
+  - "**/*.js"
+  - "**/*.jsx"
+  - "**/*.mjs"
+  - "**/*.cjs"
+  - "**/*.svelte"
+  - "**/*.vue"
+---
+
 # TypeScript Testing
 
 Follow these TypeScript-specific testing conventions in addition to the general testing guidelines.

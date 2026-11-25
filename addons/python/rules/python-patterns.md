@@ -1,3 +1,8 @@
+---
+paths:
+  - "**/*.py"
+---
+
 # Python Patterns
 
 Idiomatic Python patterns for maintainable, production-grade code.

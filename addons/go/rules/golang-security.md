@@ -1,3 +1,8 @@
+---
+paths:
+  - "**/*.go"
+---
+
 # Go Security
 
 Security rules for Go code. These complement the general security reviewer and focus on Go-specific attack vectors.

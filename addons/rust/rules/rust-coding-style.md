@@ -1,3 +1,8 @@
+---
+paths:
+  - "**/*.rs"
+---
+
 # Rust Coding Style
 
 Follow these Rust-specific conventions in addition to the general coding style guidelines. Rust has strong community conventions — `cargo fmt` and `cargo clippy` enforce most of them automatically.
