@@ -5,6 +5,10 @@ lands; keep entries short — the diff is the detail.
 
 ## 2026-11-25
 
+- **Removed the `requires_mcp` manifest field** (`chore/drop-requires-mcp`). It was documented as
+  an install-time warning, but `install.py` never read it, and its one remaining use
+  (`database-reviewer` -> `postgres`) would be wrong for Supabase projects anyway.
+
 - **Database agents can now reach the database** (`fix/agent-mcp-tools`). `database-reviewer`
   declared `tools: Read, Grep, Glob, Bash` plus `mcpServers: [postgres]`; with a `tools` list, a
   server named in `mcpServers` grants nothing, so the agent never had a query tool (and fell back

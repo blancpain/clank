@@ -196,7 +196,7 @@ When you run the installer, the following happens in order:
 
 7. **Write install receipt.** `<target>/.claude/.clank-installed.json` is written (or updated) with the list of installed artifact IDs.
 
-8. **Print summary.** Lists what was installed and what was skipped, plus soft warnings for `requires_mcp` hints (e.g. `database-reviewer` expects a `postgres` MCP server configured in `.mcp.json`).
+8. **Print summary.** Lists what was installed and what was skipped.
 
 ---
 
