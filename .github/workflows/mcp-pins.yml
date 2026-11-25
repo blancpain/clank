@@ -18,6 +18,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Open an issue for each outdated pin
+        # An explicit shell turns on pipefail, so a failing check script fails the step.
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
