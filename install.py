@@ -1268,6 +1268,10 @@ def update(
     def remove_if_unedited(rel: str, sha: str) -> bool:
         """Delete a file clank no longer ships. False if local edits kept it."""
         dst = target / rel
+        # The receipt is a file in the project; never follow it outside .claude/.
+        if (target / ".claude").resolve() not in dst.resolve().parents:
+            report("kept", rel, " (outside .claude/; not clank's to remove)")
+            return False
         if not dst.is_file():
             return True
         if _blob_sha(dst.read_bytes()) != sha:
