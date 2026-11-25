@@ -18,12 +18,15 @@ Nothing is in flight.
   `docs/install.md`, "Update workflow"). horses, sisu, mangify-ios and mangify
   are on tracked receipts as of 2026-11-25, so retired artifacts and local
   edits are handled from here on.
-- **ice-machine** predates clank. Five artifacts it shares with clank
-  (`review-before-commit` and the rules `code-review`, `long-running-scripts`,
-  `use-project-code-reviewer`, `update-agent-memory`) are on a tracked receipt
-  and follow `--update`. Its other agents, hooks, skills and the Postgres
-  wrapper are its own versions under different file names; they are not in the
-  receipt and stay hand-maintained. Moving them onto clank's versions would be
+- **ice-machine** predates clank. Seven artifacts it shares with clank (the
+  hooks `review-before-commit`, `file-safety` and `ruff`, and the rules
+  `code-review`, `long-running-scripts`, `use-project-code-reviewer`,
+  `update-agent-memory`) are on a tracked receipt and follow `--update`. Its
+  other agents, hooks, skills and the Postgres wrapper are its own versions
+  under different file names; they are not in the receipt and stay
+  hand-maintained. Its Biome and svelte-check hooks were not compared against
+  clank's (the frontend packages are only installed on the mini), and its
+  wrapper opens an SSH tunnel that clank's does not. Moving them onto clank's versions would be
   a migration, file by file, not an update.
 - **MCP server versions are pinned** in the two wrappers
   (`TOOLBOX_VERSION`, `SUPABASE_MCP_VERSION`). The weekly `mcp-pins` workflow
