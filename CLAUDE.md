@@ -45,6 +45,7 @@ Sub-agents, skills, and hooks are orthogonal mechanisms — pick deliberately:
 - `docs/` — authoring guides (`authoring-agents.md`, `authoring-hooks.md`, `authoring-skills.md`, `authoring-rules.md`, `adding-an-addon.md`) and the install reference (`install.md`). These are clank's own documentation and are NOT copied into target projects.
 - `tests/` — stdlib unittest tests for the installer. Run via `python3 -m unittest tests.test_install -v`.
 - `.github/workflows/test.yml` — CI that runs the test suite on push and PR.
+- `.github/workflows/mcp-pins.yml` — weekly check that opens an issue when a pinned MCP server version (set in the wrappers under `addons/*/mcp/`) has a newer release.
 
 ## Clank's own `.claude/`
 

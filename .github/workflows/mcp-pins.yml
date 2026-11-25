@@ -1,0 +1,39 @@
+name: mcp-pins
+
+# The MCP wrappers pin their server versions, so nothing moves until someone
+# raises a pin. This opens an issue when a pinned server has a newer release.
+
+on:
+  schedule:
+    - cron: "23 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Open an issue for each outdated pin
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          open_titles=$(gh issue list --state open --limit 200 --json title --jq '.[].title')
+          .github/scripts/check-mcp-pins.sh | while read -r package pinned latest; do
+            if printf '%s\n' "$open_titles" | grep -qF "Raise the $package pin"; then
+              echo "$package: $pinned -> $latest (an issue is already open)"
+              continue
+            fi
+            echo "$package: $pinned -> $latest (opening an issue)"
+            gh issue create \
+              --title "Raise the $package pin ($pinned -> $latest)" \
+              --body "\`$package\` is pinned at $pinned and $latest is out. A newer one may exist by the time you read this.
+
+          1. Read the release notes between the two versions.
+          2. Raise the version variable in the wrapper under \`addons/*/mcp/\`.
+          3. List the new version's tools and check that the names still match the safety hook's \`matcher\` and the agents' \`tools\` lists. For the Supabase server, also check its tool groups against \`SUPABASE_MCP_FEATURES\`.
+          4. After merging, run \`install.py --update\` in each project that uses the wrapper."
+          done

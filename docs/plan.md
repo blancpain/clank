@@ -18,10 +18,15 @@ Nothing is in flight.
   `docs/install.md`, "Update workflow"). horses, sisu, mangify-ios and mangify
   are on tracked receipts as of 2026-11-25, so retired artifacts and local
   edits are handled from here on.
-- **ice-machine** carries an old, hand-maintained copy (its receipt names a
-  branch, not a commit), so `--update` cannot merge there. Sync it by hand or
-  re-install with `--force` when it matters.
+- **ice-machine** predates clank. Five artifacts it shares with clank
+  (`review-before-commit` and the rules `code-review`, `long-running-scripts`,
+  `use-project-code-reviewer`, `update-agent-memory`) are on a tracked receipt
+  and follow `--update`. Its other agents, hooks, skills and the Postgres
+  wrapper are its own versions under different file names; they are not in the
+  receipt and stay hand-maintained. Moving them onto clank's versions would be
+  a migration, file by file, not an update.
 - **MCP server versions are pinned** in the two wrappers
-  (`TOOLBOX_VERSION`, `SUPABASE_MCP_VERSION`). When raising one, re-check the
-  tool names against the safety hooks and the `tools` line of
-  `database-reviewer`.
+  (`TOOLBOX_VERSION`, `SUPABASE_MCP_VERSION`). The weekly `mcp-pins` workflow
+  opens an issue when a newer release is out; the issue lists the steps
+  (re-check tool names against the safety hooks and the `tools` line of
+  `database-reviewer`, then `--update` each project).

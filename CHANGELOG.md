@@ -5,6 +5,12 @@ lands; keep entries short — the diff is the detail.
 
 ## 2026-11-25
 
+- **Supabase notebook tools switched off** (`fix/supabase-notebooks-and-pin-check`). The wrapper
+  now passes `--features` with the server's default tool groups minus `notebooks`. Notebook tools
+  run SQL stored in a notebook cell, which the safety hook never sees; on a writable server that
+  was a way around it. Read-only projects lose `list_notebooks`, `get_notebook` and `run_notebook`.
+- **Weekly check on the MCP version pins** (`.github/workflows/mcp-pins.yml`). Opens an issue,
+  with the steps to follow, when a pinned server has a newer release on npm.
 - **`install.py --update`** (`feat/installer-update`). Brings everything in a project's receipt to
   the current clank: untouched files are replaced, edited files get a three-way merge against the
   version they came from, retired artifacts are removed (kept if edited), and a changed settings
