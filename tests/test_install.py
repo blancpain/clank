@@ -1732,6 +1732,22 @@ class TestUpdate(unittest.TestCase):
         self.assertTrue(self.installed("skills/s2/sub/extra.md").exists())
         self.assertEqual(install.read_receipt(self.target)["artifacts"], ["s2"])
 
+    def test_receipt_cannot_point_removal_outside_dot_claude(self):
+        self.install(["r", "old"])
+        outside = self.target / "notes.md"
+        outside.write_text("old rule\n")  # same content as the retired rule
+        path = self.target / ".claude" / install.RECEIPT_NAME
+        data = json.loads(path.read_text())
+        data["files"]["old"]["notes.md"] = data["files"]["old"][".claude/rules/old.md"]
+        path.write_text(json.dumps(data))
+        del self.artifacts["old"]
+        (self.clank / "base/rules/old.md").unlink()
+        self.commit()
+        rc, _ = self.update()
+        self.assertEqual(rc, 1)
+        self.assertTrue(outside.exists())
+        self.assertFalse(self.installed("rules/old.md").exists())
+
     def test_file_dropped_from_a_skill_is_removed(self):
         self.install(["s"])
         (self.clank / "base/skills/s/sub/extra.md").unlink()
