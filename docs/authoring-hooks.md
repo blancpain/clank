@@ -185,7 +185,7 @@ Fragment for a PostToolUse Edit/Write hook (`addons/python/settings.fragments/ru
 
 Key points:
 - `$CLAUDE_PROJECT_DIR` is the target project root, set by Claude Code at runtime.
-- `matcher` is a regex matched against the tool name: `"Bash"`, `"Edit|Write"`, `"mcp__postgres__query"`.
+- `matcher` is a regex matched against the tool name: `"Bash"`, `"Edit|Write"`, `"mcp__postgres[a-z0-9-]*__execute_sql"`.
 - `statusMessage` is shown in the Claude Code UI while the hook runs.
 - The fragment file must be valid JSON. The installer validates it at lint time.
 

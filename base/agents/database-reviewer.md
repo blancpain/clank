@@ -106,9 +106,11 @@ Always quantify findings: "47 orphaned records" not "some orphaned records". Inc
 
 **YOU MUST USE THE PROJECT'S DB MCP QUERY TOOL FOR ALL DATABASE QUERIES. DO NOT USE BASH OR PYTHON.**
 
-Depending on the project's `.mcp.json` that tool is `mcp__postgres__query` (direct PostgreSQL via pg-mcp) or `mcp__supabase__execute_sql` (Supabase cloud via the Management API). Pass a SQL string and get JSON results back. No SSH tunnel, no Python scripts, no Bash needed.
+Depending on the project's `.mcp.json` that tool is `mcp__postgres__execute_sql` (direct PostgreSQL via pg-mcp) or `mcp__supabase__execute_sql` (Supabase cloud via the Management API). Pass a SQL string and get JSON results back. No SSH tunnel, no Python scripts, no Bash needed.
 
-Example: `mcp__postgres__query(sql="SELECT COUNT(*) FROM my_table")` / `mcp__supabase__execute_sql(query="SELECT COUNT(*) FROM my_table")`
+Example: `mcp__postgres__execute_sql(sql="SELECT COUNT(*) FROM my_table")` / `mcp__supabase__execute_sql(query="SELECT COUNT(*) FROM my_table")`
+
+With pg-mcp the same server also exposes ready-made read-only health tools — `list_top_bloated_tables`, `list_invalid_indexes`, `list_table_stats`, `list_active_queries`, `long_running_transactions`, `list_locks`, `database_overview`. Prefer them over hand-written catalog queries where one fits.
 
 The only exception: a local dev database the project documents as having no MCP server — plain `psql` via Bash against the documented DSN is acceptable there.
 

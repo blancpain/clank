@@ -2,7 +2,7 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "mcp__postgres[a-z0-9-]*__query",
+        "matcher": "mcp__postgres[a-z0-9-]*__execute_sql",
         "hooks": [
           {
             "type": "command",
