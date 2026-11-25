@@ -67,7 +67,7 @@ id = "bash-safety"
 type = "hook"
 path = "base/hooks/pretooluse-bash-safety.sh"
 settings_fragment = "base/settings.fragments/bash-safety.json"
-description = "PreToolUse Bash guardrails — git push reminder, destructive SQL block, rm block, tmux reminder"
+description = "PreToolUse Bash guardrails — destructive SQL block, rm block, confirmation prompt before git push"
 tags = ["base", "safety"]
 
 [[artifacts]]
@@ -393,7 +393,7 @@ id = "mcp-postgres-safety"
 type = "hook"
 path = "addons/sql/hooks/pretooluse-mcp-postgres-safety.sh"
 settings_fragment = "addons/sql/settings.fragments/mcp-postgres-safety.json"
-description = "PreToolUse guardrail on mcp__postgres__query — blocks DROP/TRUNCATE/DELETE/UPDATE"
+description = "PreToolUse guardrail on mcp__postgres__query — blocks DROP/TRUNCATE/DELETE/UPDATE, prompts on ALTER/INSERT"
 tags = ["sql", "safety", "postgres"]
 
 [[artifacts]]
@@ -481,7 +481,7 @@ id = "mcp-supabase-safety"
 type = "hook"
 path = "addons/supabase/hooks/pretooluse-mcp-supabase-safety.sh"
 settings_fragment = "addons/supabase/settings.fragments/mcp-supabase-safety.json"
-description = "PreToolUse guardrail on mcp__supabase__execute_sql and mcp__supabase__apply_migration — blocks DROP/TRUNCATE/DELETE/UPDATE"
+description = "PreToolUse guardrail on mcp__supabase__execute_sql and mcp__supabase__apply_migration — blocks DROP/TRUNCATE/DELETE/UPDATE, prompts on ALTER/INSERT"
 tags = ["supabase", "safety"]
 
 [[artifacts]]
